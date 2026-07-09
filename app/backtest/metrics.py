@@ -6,32 +6,57 @@ from typing import Any
 from app.core.types import Signal, Trade
 
 
-def calculate_metrics(trades: list[Trade], signals: list[Signal], equity_curve: list[float] | None = None) -> dict[str, Any]:
+def calculate_metrics(
+    trades: list[Trade],
+    signals: list[Signal],
+    equity_curve: list[float] | None = None,
+    open_trades: list[Trade] | None = None,
+    funnel: dict[str, int] | None = None,
+) -> dict[str, Any]:
     closed = [trade for trade in trades if trade.status == "closed"]
     wins = [trade for trade in closed if trade.pnl > 0]
     losses = [trade for trade in closed if trade.pnl < 0]
     gross_profit = sum(trade.pnl for trade in wins)
     gross_loss = abs(sum(trade.pnl for trade in losses))
     r_values = [trade.r_multiple for trade in closed]
+    total_pnl = sum(trade.pnl for trade in closed)
+    average_r = sum(r_values) / len(r_values) if r_values else 0.0
+    average_pnl = total_pnl / len(closed) if closed else 0.0
 
     rejection_counts: Counter[str] = Counter()
     for signal in signals:
         if signal.decision.value == "rejected":
             rejection_counts.update(signal.reasons)
 
+    funnel_metrics = {
+        "accepted_signals": sum(1 for signal in signals if signal.decision.value == "accepted"),
+        "trades_opened": len(trades) + len(open_trades or []),
+        "closed_trades": len(closed),
+        "open_trades_at_end": len(open_trades or []),
+        "skipped_already_in_position": 0,
+        "skipped_pending_signal_exists": 0,
+        "skipped_end_of_backtest": 0,
+    }
+    if funnel:
+        funnel_metrics.update(funnel)
+        funnel_metrics["accepted_signals"] = sum(1 for signal in signals if signal.decision.value == "accepted")
+
     return {
         "total_trades": len(closed),
-        "accepted_signals": sum(1 for signal in signals if signal.decision.value == "accepted"),
+        **funnel_metrics,
         "rejected_signals": sum(1 for signal in signals if signal.decision.value == "rejected"),
         "rejection_counts_by_reason": dict(rejection_counts),
         "win_rate": len(wins) / len(closed) if closed else 0.0,
-        "average_r": sum(r_values) / len(r_values) if r_values else 0.0,
-        "expectancy": sum(trade.pnl for trade in closed) / len(closed) if closed else 0.0,
+        "average_r": average_r,
+        "expectancy_r": average_r,
+        "average_pnl": average_pnl,
+        "expectancy_usd": average_pnl,
+        "total_pnl": total_pnl,
         "profit_factor": gross_profit / gross_loss if gross_loss else (gross_profit if gross_profit else 0.0),
         "max_drawdown": _max_drawdown(equity_curve or []),
         "max_losing_streak": _max_losing_streak(closed),
         "performance_by_side": _group_performance(closed, lambda trade: trade.side.value),
-        "performance_by_triangle_type": {},
+        "performance_by_triangle_type": _triangle_performance(closed),
     }
 
 
@@ -64,8 +89,27 @@ def _group_performance(trades: list[Trade], key_func) -> dict[str, dict[str, flo
     return {
         key: {
             "trades": len(items),
-            "pnl": sum(item.pnl for item in items),
+            "win_rate": sum(1 for item in items if item.pnl > 0) / len(items),
             "average_r": sum(item.r_multiple for item in items) / len(items),
+            "total_pnl": sum(item.pnl for item in items),
+            "profit_factor": _profit_factor(items),
         }
         for key, items in grouped.items()
     }
+
+
+def _triangle_performance(trades: list[Trade]) -> dict[str, dict[str, float]]:
+    result = {
+        kind: {"trades": 0, "win_rate": 0.0, "average_r": 0.0, "total_pnl": 0.0, "profit_factor": 0.0}
+        for kind in ("ascending", "descending", "symmetrical")
+    }
+    result.update(_group_performance([trade for trade in trades if trade.triangle_type], lambda trade: trade.triangle_type or "unknown"))
+    return result
+
+
+def _profit_factor(trades: list[Trade]) -> float:
+    wins = [trade for trade in trades if trade.pnl > 0]
+    losses = [trade for trade in trades if trade.pnl < 0]
+    gross_profit = sum(trade.pnl for trade in wins)
+    gross_loss = abs(sum(trade.pnl for trade in losses))
+    return gross_profit / gross_loss if gross_loss else (gross_profit if gross_profit else 0.0)

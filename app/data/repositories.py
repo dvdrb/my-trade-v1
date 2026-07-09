@@ -67,8 +67,9 @@ class SignalRepository:
             """
             INSERT INTO signals
             (symbol, timeframe, open_time, decision, side, score, reasons, entry_price,
-             stop_loss, take_profit, reward_risk, strategy_version, triangle_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             stop_loss, take_profit, reward_risk, strategy_version, triangle_type, position_size,
+             risk_amount, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 signal.symbol,
@@ -84,6 +85,9 @@ class SignalRepository:
                 signal.reward_risk,
                 signal.strategy_version,
                 signal.triangle_type,
+                signal.position_size,
+                signal.risk_amount,
+                json.dumps(signal.metadata),
             ),
         )
         self.connection.commit()
@@ -98,8 +102,9 @@ class TradeRepository:
             """
             INSERT INTO trades
             (symbol, timeframe, side, entry_time, entry_price, size, stop_loss, take_profit,
-             exit_time, exit_price, pnl, r_multiple, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             exit_time, exit_price, pnl, r_multiple, status, signal_time, strategy_version,
+             triangle_type, risk_amount)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 trade.symbol,
@@ -115,6 +120,10 @@ class TradeRepository:
                 trade.pnl,
                 trade.r_multiple,
                 trade.status,
+                trade.signal_time,
+                trade.strategy_version,
+                trade.triangle_type,
+                trade.risk_amount,
             ),
         )
         self.connection.commit()
@@ -150,4 +159,7 @@ def signal_from_row(row: sqlite3.Row) -> Signal:
         reward_risk=row["reward_risk"],
         strategy_version=row["strategy_version"],
         triangle_type=row["triangle_type"],
+        position_size=row["position_size"] if "position_size" in row.keys() else None,
+        risk_amount=row["risk_amount"] if "risk_amount" in row.keys() else None,
+        metadata=json.loads(row["metadata"]) if "metadata" in row.keys() and row["metadata"] else {},
     )

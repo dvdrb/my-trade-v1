@@ -35,11 +35,42 @@ def nearest_resistance(zones: list[StrongZone], price: float) -> StrongZone | No
 
 
 def blocked_by_opposite_zone(zones: list[StrongZone], side: Side, entry: float, stop: float, within_r: float) -> bool:
+    return blocking_opposite_zone(zones, side, entry, stop, within_r) is not None
+
+
+def blocking_opposite_zone(zones: list[StrongZone], side: Side, entry: float, stop: float, within_r: float) -> dict[str, float | int | str] | None:
     risk = abs(entry - stop)
     if risk <= 0:
-        return True
+        return {
+            "zone_kind": "unknown",
+            "zone_low": entry,
+            "zone_high": entry,
+            "distance_to_zone": 0.0,
+            "distance_to_zone_r": 0.0,
+            "zone_touches": 0,
+            "zone_strength": 0.0,
+        }
     if side == Side.LONG:
         resistance = nearest_resistance(zones, entry)
-        return resistance is not None and (resistance.low - entry) / risk <= within_r
-    support = nearest_support(zones, entry)
-    return support is not None and (entry - support.high) / risk <= within_r
+        if resistance is None:
+            return None
+        distance = resistance.low - entry
+        zone = resistance
+    else:
+        support = nearest_support(zones, entry)
+        if support is None:
+            return None
+        distance = entry - support.high
+        zone = support
+    distance_r = distance / risk
+    if distance_r > within_r:
+        return None
+    return {
+        "zone_kind": zone.kind,
+        "zone_low": zone.low,
+        "zone_high": zone.high,
+        "distance_to_zone": distance,
+        "distance_to_zone_r": distance_r,
+        "zone_touches": zone.touches,
+        "zone_strength": zone.strength,
+    }

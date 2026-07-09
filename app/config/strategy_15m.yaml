@@ -3,15 +3,15 @@ mode: paper
 market:
   symbols:
     - BTC
-  timeframe: 1h
-  warmup_candles: 300
+  timeframe: 15m
+  warmup_candles: 600
 
 strategy:
   version: triangle-trend-zones-v1
 
   pivots:
-    left: 3
-    right: 3
+    left: 4
+    right: 4
 
   trend:
     ema_fast: 50
@@ -19,13 +19,13 @@ strategy:
     require_alignment: true
 
   triangle:
-    min_candles: 10
-    max_candles: 80
+    min_candles: 16
+    max_candles: 160
     breakout_buffer_percent: 0.0015
     flat_tolerance_percent: 0.003
 
   breakout:
-    min_body_percent: 0.25
+    min_body_percent: 0.30
 
   zones:
     tolerance_percent: 0.003

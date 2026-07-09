@@ -81,6 +81,9 @@ class Signal:
     strategy_version: str = ""
     triangle_type: str | None = None
     open_time: int | None = None
+    position_size: float | None = None
+    risk_amount: float | None = None
+    metadata: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -98,3 +101,7 @@ class Trade:
     pnl: float = 0.0
     r_multiple: float = 0.0
     status: str = "open"
+    signal_time: int | None = None
+    strategy_version: str = ""
+    triangle_type: str | None = None
+    risk_amount: float | None = None

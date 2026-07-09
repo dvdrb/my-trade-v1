@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.config.settings import AppConfig
-from app.core.types import Candle, Decision, Pivot, Side, Signal, TrendDirection
+from app.core.types import Candle, Decision, Pivot, Side, Signal, StrongZone, TrendDirection
 from app.indicators.ema import ema
 from app.strategy.breakout import detect_breakout
 from app.strategy.evaluator import evaluate
@@ -83,7 +83,52 @@ def test_signal_accepted_and_rejected_reasons(monkeypatch) -> None:
     monkeypatch.setattr("app.strategy.evaluator.build_zones", lambda *_: [])
     accepted = evaluate(candles, config)
     assert accepted.decision == Decision.ACCEPTED
+    assert accepted.risk_amount == 5
+    assert accepted.position_size is not None
     monkeypatch.setattr("app.strategy.evaluator.ema_trend", lambda *_: TrendDirection.BEARISH)
     rejected = evaluate(candles, config)
     assert rejected.decision == Decision.REJECTED
     assert "trend is not bullish for long" in rejected.reasons
+
+
+def test_configurable_breakout_body_filter_is_passed(monkeypatch) -> None:
+    candles = [c(i, 100 + i, 90 + i, close=95 + i) for i in range(20)]
+    config = AppConfig()
+    config.strategy.breakout.min_body_percent = 0.55
+    triangle = detect_triangle([p(0, 100, "high"), p(2, 90, "low"), p(6, 100.1, "high"), p(8, 95, "low")], 19, 10, 80, 0.003)
+    assert triangle is not None
+    seen: dict[str, float] = {}
+
+    def fake_breakout(candle, triangle, index, buffer_percent, min_body_percent):
+        seen["min_body_percent"] = min_body_percent
+        return None
+
+    monkeypatch.setattr("app.strategy.evaluator.detect_pivots", lambda *_: [p(1, 100, "high"), p(2, 90, "low"), p(4, 101, "high"), p(6, 95, "low")])
+    monkeypatch.setattr("app.strategy.evaluator.detect_triangle", lambda *_: triangle)
+    monkeypatch.setattr("app.strategy.evaluator.detect_breakout", fake_breakout)
+    evaluate(candles, config)
+    assert seen["min_body_percent"] == 0.55
+
+
+def test_zone_block_diagnostics_are_present(monkeypatch) -> None:
+    candles = [c(i, 100 + i, 90 + i, close=95 + i) for i in range(20)]
+    config = AppConfig()
+    triangle = detect_triangle([p(0, 100, "high"), p(2, 90, "low"), p(6, 100.1, "high"), p(8, 95, "low")], 19, 10, 80, 0.003)
+    assert triangle is not None
+    monkeypatch.setattr("app.strategy.evaluator.detect_pivots", lambda *_: [p(1, 100, "high"), p(2, 90, "low"), p(4, 101, "high"), p(6, 95, "low")])
+    monkeypatch.setattr("app.strategy.evaluator.detect_triangle", lambda *_: triangle)
+    monkeypatch.setattr("app.strategy.evaluator.detect_breakout", lambda *_: Side.LONG)
+    monkeypatch.setattr("app.strategy.evaluator.ema_trend", lambda *_: TrendDirection.BULLISH)
+    monkeypatch.setattr("app.strategy.evaluator.build_zones", lambda *_: [StrongZone("resistance", 116, 117, 3, 3.0)])
+
+    signal = evaluate(candles, config)
+    assert signal.decision == Decision.REJECTED
+    assert "blocked by nearby opposite zone" in signal.reasons
+    diagnostics = signal.metadata["zone_block"]
+    assert diagnostics["zone_kind"] == "resistance"
+    assert diagnostics["zone_low"] == 116
+    assert diagnostics["zone_high"] == 117
+    assert diagnostics["zone_touches"] == 3
+    assert diagnostics["zone_strength"] == 3.0
+    assert "distance_to_zone" in diagnostics
+    assert "distance_to_zone_r" in diagnostics

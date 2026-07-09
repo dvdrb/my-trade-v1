@@ -7,10 +7,10 @@ from app.strategy.pivots import detect_pivots
 from app.strategy.risk import calculate_risk_plan
 from app.strategy.trend import ema_trend, structure_trend
 from app.strategy.triangle import detect_triangle
-from app.strategy.zones import blocked_by_opposite_zone, build_zones
+from app.strategy.zones import blocking_opposite_zone, build_zones
 
 
-def evaluate(candles: list[Candle], config: AppConfig, symbol: str | None = None, timeframe: str | None = None) -> Signal:
+def evaluate(candles: list[Candle], config: AppConfig, symbol: str | None = None, timeframe: str | None = None, equity: float | None = None) -> Signal:
     actual_symbol = symbol or (candles[-1].symbol if candles else config.market.symbols[0])
     actual_timeframe = timeframe or (candles[-1].timeframe if candles else config.market.timeframe)
     if len(candles) < config.strategy.triangle.min_candles + config.strategy.pivots.right + 2:
@@ -28,7 +28,13 @@ def evaluate(candles: list[Candle], config: AppConfig, symbol: str | None = None
     if triangle is None:
         return Signal(actual_symbol, actual_timeframe, Decision.NO_SETUP, reasons=["no valid triangle"], strategy_version=config.strategy.version, open_time=candles[-1].open_time)
 
-    side = detect_breakout(candles[-1], triangle, current_index, config.strategy.triangle.breakout_buffer_percent)
+    side = detect_breakout(
+        candles[-1],
+        triangle,
+        current_index,
+        config.strategy.triangle.breakout_buffer_percent,
+        config.strategy.breakout.min_body_percent,
+    )
     if side is None:
         return Signal(actual_symbol, actual_timeframe, Decision.NO_SETUP, reasons=["no confirmed breakout"], strategy_version=config.strategy.version, triangle_type=triangle.kind, open_time=candles[-1].open_time)
 
@@ -48,7 +54,7 @@ def evaluate(candles: list[Candle], config: AppConfig, symbol: str | None = None
         pivots,
         triangle,
         current_index,
-        config.risk.starting_balance,
+        equity if equity is not None else config.risk.starting_balance,
         config.risk.risk_per_trade_percent,
         config.risk.min_reward_risk,
     )
@@ -56,8 +62,13 @@ def evaluate(candles: list[Candle], config: AppConfig, symbol: str | None = None
         reasons.append("invalid risk reward")
 
     zones = build_zones(pivots, config.strategy.zones.tolerance_percent, config.strategy.zones.min_touches)
-    if risk and blocked_by_opposite_zone(zones, side, risk.entry_price, risk.stop_loss, config.strategy.zones.avoid_opposite_zone_within_r):
+    metadata: dict[str, object] = {}
+    zone_block = None
+    if risk:
+        zone_block = blocking_opposite_zone(zones, side, risk.entry_price, risk.stop_loss, config.strategy.zones.avoid_opposite_zone_within_r)
+    if zone_block:
         reasons.append("blocked by nearby opposite zone")
+        metadata["zone_block"] = zone_block
 
     if reasons:
         return Signal(
@@ -69,6 +80,7 @@ def evaluate(candles: list[Candle], config: AppConfig, symbol: str | None = None
             strategy_version=config.strategy.version,
             triangle_type=triangle.kind,
             open_time=candles[-1].open_time,
+            metadata=metadata,
         )
 
     assert risk is not None
@@ -86,4 +98,6 @@ def evaluate(candles: list[Candle], config: AppConfig, symbol: str | None = None
         strategy_version=config.strategy.version,
         triangle_type=triangle.kind,
         open_time=candles[-1].open_time,
+        position_size=risk.position_size,
+        risk_amount=(equity if equity is not None else config.risk.starting_balance) * config.risk.risk_per_trade_percent,
     )

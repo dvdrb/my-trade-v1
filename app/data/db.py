@@ -69,3 +69,16 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
             );
             """
         )
+        _add_column(connection, "signals", "position_size", "REAL")
+        _add_column(connection, "signals", "risk_amount", "REAL")
+        _add_column(connection, "signals", "metadata", "TEXT NOT NULL DEFAULT '{}'")
+        _add_column(connection, "trades", "signal_time", "INTEGER")
+        _add_column(connection, "trades", "strategy_version", "TEXT NOT NULL DEFAULT ''")
+        _add_column(connection, "trades", "triangle_type", "TEXT")
+        _add_column(connection, "trades", "risk_amount", "REAL")
+
+
+def _add_column(connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+    columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in columns:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")

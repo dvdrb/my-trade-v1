@@ -34,6 +34,10 @@ class TriangleConfig(BaseModel):
     flat_tolerance_percent: float = 0.003
 
 
+class BreakoutConfig(BaseModel):
+    min_body_percent: float = 0.25
+
+
 class ZoneConfig(BaseModel):
     tolerance_percent: float = 0.003
     min_touches: int = 2
@@ -45,6 +49,7 @@ class StrategyConfig(BaseModel):
     pivots: PivotConfig = Field(default_factory=PivotConfig)
     trend: TrendConfig = Field(default_factory=TrendConfig)
     triangle: TriangleConfig = Field(default_factory=TriangleConfig)
+    breakout: BreakoutConfig = Field(default_factory=BreakoutConfig)
     zones: ZoneConfig = Field(default_factory=ZoneConfig)
 
 
