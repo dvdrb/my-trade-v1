@@ -103,8 +103,11 @@ class TradeRepository:
             INSERT INTO trades
             (symbol, timeframe, side, entry_time, entry_price, size, stop_loss, take_profit,
              exit_time, exit_price, pnl, r_multiple, status, signal_time, strategy_version,
-             triangle_type, risk_amount)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             triangle_type, risk_amount, score_total, score_trend_quality, score_zone_quality,
+             score_risk_quality, triangle_cleanliness_score, triangle_wick_violation_count,
+             triangle_close_violation_count, triangle_max_wick_violation,
+             triangle_max_close_violation, triangle_line_tolerance_used)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 trade.symbol,
@@ -124,6 +127,16 @@ class TradeRepository:
                 trade.strategy_version,
                 trade.triangle_type,
                 trade.risk_amount,
+                trade.score_total,
+                trade.score_trend_quality,
+                trade.score_zone_quality,
+                trade.score_risk_quality,
+                trade.triangle_cleanliness_score,
+                trade.triangle_wick_violation_count,
+                trade.triangle_close_violation_count,
+                trade.triangle_max_wick_violation,
+                trade.triangle_max_close_violation,
+                trade.triangle_line_tolerance_used,
             ),
         )
         self.connection.commit()

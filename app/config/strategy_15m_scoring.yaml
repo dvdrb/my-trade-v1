@@ -1,0 +1,75 @@
+mode: paper
+
+market:
+  symbols:
+    - BTC
+  timeframe: 15m
+  warmup_candles: 800
+
+strategy:
+  version: triangle-trend-zones-15m-scoring-v1
+
+  scoring:
+    use_scoring_model: true
+    min_trade_score: 50
+    trend_as_hard_filter: false
+    zone_as_hard_filter: false
+
+    weights:
+      triangle_quality: 20
+      breakout_quality: 20
+      trend_quality: 20
+      zone_quality: 20
+      risk_quality: 20
+
+  pivots:
+    left: 4
+    right: 4
+
+  trend:
+    ema_fast: 50
+    ema_slow: 200
+    require_alignment: false
+    require_ema_slope: false
+    ema_slope_lookback: 12
+
+  triangle:
+    min_candles: 16
+    max_candles: 160
+    breakout_buffer_percent: 0.0015
+    flat_tolerance_percent: 0.003
+    max_candidates: 20
+    tolerance_mode: percent
+    line_tolerance_percent: 0.002
+    max_wick_violation_percent: 0.004
+    max_close_violation_percent: 0.002
+    max_allowed_close_violations: 2
+    max_allowed_wick_violations: 4
+
+  breakout:
+    min_body_percent: 0.30
+
+  zones:
+    tolerance_percent: 0.003
+    min_touches: 2
+    avoid_opposite_zone_within_r: 1.5
+
+risk:
+  starting_balance: 1000
+  risk_per_trade_percent: 0.005
+  absolute_min_reward_risk: 1.2
+  target_reward_risk: 2.0
+  min_reward_risk: 2.0
+  fee_percent: 0.0005
+  slippage_percent: 0.0005
+
+  score_risk_tiers:
+    - min_score: 75
+      risk_percent: 0.005
+    - min_score: 60
+      risk_percent: 0.003
+    - min_score: 50
+      risk_percent: 0.0015
+
+paper:
+  enabled: true

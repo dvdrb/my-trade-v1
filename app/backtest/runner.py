@@ -99,6 +99,16 @@ def _open_trade(signal: Signal, candle: Candle, slippage_percent: float) -> Trad
         strategy_version=signal.strategy_version,
         triangle_type=signal.triangle_type,
         risk_amount=signal.risk_amount,
+        score_total=_metadata_float(signal, "score_total"),
+        score_trend_quality=_metadata_float(signal, "score_trend_quality"),
+        score_zone_quality=_metadata_float(signal, "score_zone_quality"),
+        score_risk_quality=_metadata_float(signal, "score_risk_quality"),
+        triangle_cleanliness_score=_metadata_float(signal, "triangle_cleanliness_score"),
+        triangle_wick_violation_count=_metadata_int(signal, "triangle_wick_violation_count"),
+        triangle_close_violation_count=_metadata_int(signal, "triangle_close_violation_count"),
+        triangle_max_wick_violation=_metadata_float(signal, "triangle_max_wick_violation"),
+        triangle_max_close_violation=_metadata_float(signal, "triangle_max_close_violation"),
+        triangle_line_tolerance_used=_metadata_float(signal, "triangle_line_tolerance_used"),
     )
 
 
@@ -142,6 +152,16 @@ def _maybe_close_trade(trade: Trade, candle: Candle, fee_percent: float, slippag
         trade.strategy_version,
         trade.triangle_type,
         trade.risk_amount,
+        trade.score_total,
+        trade.score_trend_quality,
+        trade.score_zone_quality,
+        trade.score_risk_quality,
+        trade.triangle_cleanliness_score,
+        trade.triangle_wick_violation_count,
+        trade.triangle_close_violation_count,
+        trade.triangle_max_wick_violation,
+        trade.triangle_max_close_violation,
+        trade.triangle_line_tolerance_used,
     )
 
 
@@ -171,4 +191,24 @@ def _mark_unrealized(trade: Trade, candle: Candle) -> Trade:
         trade.strategy_version,
         trade.triangle_type,
         trade.risk_amount,
+        trade.score_total,
+        trade.score_trend_quality,
+        trade.score_zone_quality,
+        trade.score_risk_quality,
+        trade.triangle_cleanliness_score,
+        trade.triangle_wick_violation_count,
+        trade.triangle_close_violation_count,
+        trade.triangle_max_wick_violation,
+        trade.triangle_max_close_violation,
+        trade.triangle_line_tolerance_used,
     )
+
+
+def _metadata_float(signal: Signal, key: str) -> float | None:
+    value = signal.metadata.get(key)
+    return float(value) if isinstance(value, int | float) else None
+
+
+def _metadata_int(signal: Signal, key: str) -> int | None:
+    value = signal.metadata.get(key)
+    return int(value) if isinstance(value, int | float) else None

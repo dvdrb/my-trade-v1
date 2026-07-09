@@ -105,3 +105,13 @@ class Trade:
     strategy_version: str = ""
     triangle_type: str | None = None
     risk_amount: float | None = None
+    score_total: float | None = None
+    score_trend_quality: float | None = None
+    score_zone_quality: float | None = None
+    score_risk_quality: float | None = None
+    triangle_cleanliness_score: float | None = None
+    triangle_wick_violation_count: int | None = None
+    triangle_close_violation_count: int | None = None
+    triangle_max_wick_violation: float | None = None
+    triangle_max_close_violation: float | None = None
+    triangle_line_tolerance_used: float | None = None

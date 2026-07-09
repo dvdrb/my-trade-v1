@@ -23,6 +23,12 @@ strategy:
     max_candles: 80
     breakout_buffer_percent: 0.0015
     flat_tolerance_percent: 0.003
+    tolerance_mode: percent
+    line_tolerance_percent: 0.002
+    max_wick_violation_percent: 0.004
+    max_close_violation_percent: 0.002
+    max_allowed_close_violations: 2
+    max_allowed_wick_violations: 4
 
   breakout:
     min_body_percent: 0.25

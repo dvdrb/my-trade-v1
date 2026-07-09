@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from app.config.settings import AppConfig
 from app.core.types import Candle, Decision, Pivot, Side, Signal, StrongZone, TrendDirection
+from app.strategy.candidates import TriangleCandidate
+from app.strategy.risk import RiskPlan
+from app.strategy.scoring import ScoreBreakdown
 from app.indicators.ema import ema
 from app.strategy.breakout import detect_breakout
 from app.strategy.evaluator import evaluate
@@ -99,7 +102,7 @@ def test_configurable_breakout_body_filter_is_passed(monkeypatch) -> None:
     assert triangle is not None
     seen: dict[str, float] = {}
 
-    def fake_breakout(candle, triangle, index, buffer_percent, min_body_percent):
+    def fake_breakout(candle, triangle, index, buffer_percent, min_body_percent, line_tolerance_percent=0.0):
         seen["min_body_percent"] = min_body_percent
         return None
 
@@ -132,3 +135,42 @@ def test_zone_block_diagnostics_are_present(monkeypatch) -> None:
     assert diagnostics["zone_strength"] == 3.0
     assert "distance_to_zone" in diagnostics
     assert "distance_to_zone_r" in diagnostics
+
+
+def test_scoring_evaluator_selects_highest_scoring_candidate(monkeypatch) -> None:
+    candles = [c(i, 100 + i, 90 + i, close=95 + i, open_=94 + i) for i in range(25)]
+    config = AppConfig()
+    config.strategy.scoring.use_scoring_model = True
+    config.strategy.scoring.min_trade_score = 50
+    config.strategy.scoring.trend_as_hard_filter = False
+    config.strategy.scoring.zone_as_hard_filter = False
+    config.risk.absolute_min_reward_risk = 1.2
+    config.risk.target_reward_risk = 2.0
+    config.risk.score_risk_tiers = [{"min_score": 50, "risk_percent": 0.0015}]
+    t1 = detect_triangle([p(0, 100, "high"), p(2, 90, "low"), p(6, 100.1, "high"), p(8, 95, "low")], 24, 10, 80, 0.003)
+    t2 = detect_triangle([p(0, 110, "high"), p(2, 90, "low"), p(6, 105, "high"), p(8, 95, "low")], 24, 10, 80, 0.003)
+    assert t1 and t2
+    c1 = TriangleCandidate(t1, "ascending", t1.start_index, t1.end_index, 24, 2, 2, 0.2, 0.7)
+    c2 = TriangleCandidate(t2, "symmetrical", t2.start_index, t2.end_index, 24, 2, 2, 0.5, 0.9)
+
+    monkeypatch.setattr("app.strategy.evaluator.detect_pivots", lambda *_: [p(1, 100, "high"), p(2, 90, "low"), p(4, 101, "high"), p(6, 95, "low")])
+    monkeypatch.setattr("app.strategy.evaluator.find_triangle_candidates", lambda *_: [c1, c2])
+    monkeypatch.setattr("app.strategy.evaluator.detect_breakout", lambda *_: Side.LONG)
+    monkeypatch.setattr("app.strategy.evaluator.calculate_risk_plan", lambda *args: RiskPlan(args[2][-1].price + 10, args[2][-1].price, args[2][-1].price + 30, 2.0, 1))
+
+    def fake_score(candidate, *_):
+        return ScoreBreakdown(55 if candidate is c1 else 80, 10, 10, 10, 10, 15, ["ok"], [])
+
+    monkeypatch.setattr("app.strategy.evaluator.score_candidate", fake_score)
+    signal = evaluate(candles, config)
+    assert signal.decision == Decision.ACCEPTED
+    assert signal.triangle_type == "symmetrical"
+    assert signal.metadata["score_total"] == 80
+    assert signal.metadata["candidate_count"] == 2
+    assert signal.metadata["candidate_rank"] == 1
+    assert "triangle_cleanliness_score" in signal.metadata
+    assert "triangle_wick_violation_count" in signal.metadata
+    assert "triangle_close_violation_count" in signal.metadata
+    assert "triangle_max_wick_violation" in signal.metadata
+    assert "triangle_max_close_violation" in signal.metadata
+    assert "triangle_line_tolerance_used" in signal.metadata

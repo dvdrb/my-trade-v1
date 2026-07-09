@@ -25,6 +25,8 @@ class TrendConfig(BaseModel):
     ema_fast: int = 50
     ema_slow: int = 200
     require_alignment: bool = True
+    require_ema_slope: bool = False
+    ema_slope_lookback: int = 12
 
 
 class TriangleConfig(BaseModel):
@@ -32,6 +34,32 @@ class TriangleConfig(BaseModel):
     max_candles: int = 80
     breakout_buffer_percent: float = 0.0015
     flat_tolerance_percent: float = 0.003
+    max_candidates: int = 20
+    tolerance_mode: str = "percent"
+    line_tolerance_percent: float = 0.0
+    max_wick_violation_percent: float = 1.0
+    max_close_violation_percent: float = 1.0
+    max_allowed_close_violations: int = 1_000_000
+    max_allowed_wick_violations: int = 1_000_000
+    line_tolerance_atr: float = 0.25
+    max_wick_violation_atr: float = 0.50
+    max_close_violation_atr: float = 0.25
+
+
+class ScoringWeights(BaseModel):
+    triangle_quality: float = 20.0
+    breakout_quality: float = 20.0
+    trend_quality: float = 20.0
+    zone_quality: float = 20.0
+    risk_quality: float = 20.0
+
+
+class ScoringConfig(BaseModel):
+    use_scoring_model: bool = False
+    min_trade_score: float = 50.0
+    trend_as_hard_filter: bool = True
+    zone_as_hard_filter: bool = True
+    weights: ScoringWeights = Field(default_factory=ScoringWeights)
 
 
 class BreakoutConfig(BaseModel):
@@ -46,6 +74,7 @@ class ZoneConfig(BaseModel):
 
 class StrategyConfig(BaseModel):
     version: str = "triangle-trend-zones-v1"
+    scoring: ScoringConfig = Field(default_factory=ScoringConfig)
     pivots: PivotConfig = Field(default_factory=PivotConfig)
     trend: TrendConfig = Field(default_factory=TrendConfig)
     triangle: TriangleConfig = Field(default_factory=TriangleConfig)
@@ -57,8 +86,11 @@ class RiskConfig(BaseModel):
     starting_balance: float = 1000.0
     risk_per_trade_percent: float = 0.005
     min_reward_risk: float = 2.0
+    absolute_min_reward_risk: float = 2.0
+    target_reward_risk: float = 2.0
     fee_percent: float = 0.0005
     slippage_percent: float = 0.0005
+    score_risk_tiers: list[dict[str, float]] = Field(default_factory=list)
 
 
 class PaperConfig(BaseModel):

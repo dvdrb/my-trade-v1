@@ -1,0 +1,2 @@
+symbol,timeframe,side,entry_time,entry_price,size,stop_loss,take_profit,exit_time,exit_price,pnl,r_multiple,status,signal_time,strategy_version,triangle_type,risk_amount,score_total,score_trend_quality,score_zone_quality,score_risk_quality
+BTC,15m,long,1783620900000,63419.693999999996,0.005968222660398026,62546.0,65072.0,1783622700000,63250.0,-1.0127715761335578,-0.19422589602308893,open,1783620000000,triangle-trend-zones-15m-scoring-v1,ascending,5.0252434800551375,79.64449813852451,20.0,6.0,20.0

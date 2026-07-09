@@ -76,6 +76,16 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
         _add_column(connection, "trades", "strategy_version", "TEXT NOT NULL DEFAULT ''")
         _add_column(connection, "trades", "triangle_type", "TEXT")
         _add_column(connection, "trades", "risk_amount", "REAL")
+        _add_column(connection, "trades", "score_total", "REAL")
+        _add_column(connection, "trades", "score_trend_quality", "REAL")
+        _add_column(connection, "trades", "score_zone_quality", "REAL")
+        _add_column(connection, "trades", "score_risk_quality", "REAL")
+        _add_column(connection, "trades", "triangle_cleanliness_score", "REAL")
+        _add_column(connection, "trades", "triangle_wick_violation_count", "INTEGER")
+        _add_column(connection, "trades", "triangle_close_violation_count", "INTEGER")
+        _add_column(connection, "trades", "triangle_max_wick_violation", "REAL")
+        _add_column(connection, "trades", "triangle_max_close_violation", "REAL")
+        _add_column(connection, "trades", "triangle_line_tolerance_used", "REAL")
 
 
 def _add_column(connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:

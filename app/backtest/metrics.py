@@ -57,6 +57,13 @@ def calculate_metrics(
         "max_losing_streak": _max_losing_streak(closed),
         "performance_by_side": _group_performance(closed, lambda trade: trade.side.value),
         "performance_by_triangle_type": _triangle_performance(closed),
+        "score_bucket_performance": _score_bucket_performance(closed),
+        "performance_by_score_bucket": _score_bucket_performance(closed),
+        "performance_by_trend_score_bucket": _quality_bucket_performance(closed, "score_trend_quality"),
+        "performance_by_zone_score_bucket": _quality_bucket_performance(closed, "score_zone_quality"),
+        "performance_by_risk_score_bucket": _quality_bucket_performance(closed, "score_risk_quality"),
+        "performance_by_triangle_cleanliness_bucket": _quality_bucket_performance(closed, "triangle_cleanliness_score"),
+        "candidate_funnel": _candidate_funnel(signals),
     }
 
 
@@ -113,3 +120,45 @@ def _profit_factor(trades: list[Trade]) -> float:
     gross_profit = sum(trade.pnl for trade in wins)
     gross_loss = abs(sum(trade.pnl for trade in losses))
     return gross_profit / gross_loss if gross_loss else (gross_profit if gross_profit else 0.0)
+
+
+def _score_bucket_performance(trades: list[Trade]) -> dict[str, dict[str, float]]:
+    return _bucket_performance(trades, lambda trade: trade.score_total, [(80, 100, "80_100"), (70, 79.9999, "70_79"), (60, 69.9999, "60_69"), (50, 59.9999, "50_59")])
+
+
+def _quality_bucket_performance(trades: list[Trade], field_name: str) -> dict[str, dict[str, float]]:
+    return _bucket_performance(trades, lambda trade: getattr(trade, field_name), [(15, 20, "15_20"), (10, 14.9999, "10_14"), (5, 9.9999, "5_9"), (0, 4.9999, "0_4")])
+
+
+def _bucket_performance(trades: list[Trade], value_func, buckets: list[tuple[float, float, str]]) -> dict[str, dict[str, float]]:
+    result = {label: {"trades": 0, "win_rate": 0.0, "average_r": 0.0, "total_pnl": 0.0, "profit_factor": 0.0} for _, _, label in buckets}
+    grouped: dict[str, list[Trade]] = defaultdict(list)
+    for trade in trades:
+        value = value_func(trade)
+        if value is None:
+            continue
+        for low, high, label in buckets:
+            if low <= value <= high:
+                grouped[label].append(trade)
+                break
+    for label, items in grouped.items():
+        result[label] = {
+            "trades": len(items),
+            "win_rate": sum(1 for item in items if item.pnl > 0) / len(items),
+            "average_r": sum(item.r_multiple for item in items) / len(items),
+            "total_pnl": sum(item.pnl for item in items),
+            "profit_factor": _profit_factor(items),
+        }
+    return result
+
+
+def _candidate_funnel(signals: list[Signal]) -> dict[str, int]:
+    return {
+        "candles_processed": len(signals),
+        "triangle_candidates_found": sum(int(signal.metadata.get("triangle_candidates_found", 0)) for signal in signals),
+        "breakout_candidates_found": sum(int(signal.metadata.get("breakout_candidates_found", 0)) for signal in signals),
+        "scored_candidates": sum(int(signal.metadata.get("scored_candidates", 0)) for signal in signals),
+        "accepted_signals": sum(1 for signal in signals if signal.decision.value == "accepted"),
+        "rejected_by_absolute_risk": sum(int(signal.metadata.get("rejected_by_absolute_risk", 0)) for signal in signals),
+        "rejected_by_score": sum(int(signal.metadata.get("rejected_by_score", 0)) for signal in signals),
+    }

@@ -84,14 +84,21 @@ def test_fee_slippage_take_profit_stop_loss_and_ambiguous_conservative() -> None
 
 def test_metrics_and_report_files_generated(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
-    trade = Trade("BTC", "1h", Side.LONG, 1, 100, 1, 95, 110, 2, 110, 10, 2, "closed", 1, "test", "ascending", 5)
-    signal = Signal("BTC", "1h", Decision.REJECTED, reasons=["bad trend"])
+    trade = Trade("BTC", "1h", Side.LONG, 1, 100, 1, 95, 110, 2, 110, 10, 2, "closed", 1, "test", "ascending", 5, 82, 16, 18, 20, 17, 1, 0, 0.001, 0.0, 0.002)
+    signal = Signal("BTC", "1h", Decision.REJECTED, reasons=["bad trend"], metadata={"triangle_candidates_found": 2, "breakout_candidates_found": 1, "scored_candidates": 1, "rejected_by_score": 1})
     metrics = calculate_metrics([trade], [signal], [1000, 1010])
     assert metrics["total_trades"] == 1
     assert metrics["expectancy_r"] == 2
     assert metrics["expectancy_usd"] == 10
     assert metrics["total_pnl"] == 10
     assert metrics["performance_by_triangle_type"]["ascending"]["trades"] == 1
+    assert metrics["score_bucket_performance"]["80_100"]["trades"] == 1
+    assert metrics["performance_by_trend_score_bucket"]["15_20"]["trades"] == 1
+    assert metrics["performance_by_zone_score_bucket"]["15_20"]["trades"] == 1
+    assert metrics["performance_by_risk_score_bucket"]["15_20"]["trades"] == 1
+    assert metrics["performance_by_triangle_cleanliness_bucket"]["15_20"]["trades"] == 1
+    assert metrics["candidate_funnel"]["triangle_candidates_found"] == 2
+    assert metrics["candidate_funnel"]["rejected_by_score"] == 1
     assert metrics["rejection_counts_by_reason"] == {"bad trend": 1}
     from app.backtest.report import write_report
 

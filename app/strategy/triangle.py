@@ -1,6 +1,15 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from app.core.types import Pivot, Triangle
+
+
+@dataclass(frozen=True)
+class Band:
+    center: float
+    lower: float
+    upper: float
 
 
 def line_price_at(start_index: int, start_price: float, end_index: int, end_price: float, index: int) -> float:
@@ -66,3 +75,15 @@ def triangle_upper_at(triangle: Triangle, index: int) -> float:
 
 def triangle_lower_at(triangle: Triangle, index: int) -> float:
     return line_price_at(triangle.start_index, triangle.lower_start, triangle.end_index, triangle.lower_end, index)
+
+
+def triangle_upper_band_at(triangle: Triangle, index: int, tolerance_percent: float) -> Band:
+    center = triangle_upper_at(triangle, index)
+    tolerance = center * tolerance_percent
+    return Band(center=center, lower=center - tolerance, upper=center + tolerance)
+
+
+def triangle_lower_band_at(triangle: Triangle, index: int, tolerance_percent: float) -> Band:
+    center = triangle_lower_at(triangle, index)
+    tolerance = center * tolerance_percent
+    return Band(center=center, lower=center - tolerance, upper=center + tolerance)
