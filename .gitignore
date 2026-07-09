@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Local runtime outputs
+data/*.sqlite
+data/*.sqlite3
+data/*.db
+logs/*
+reports/backtests/
+
+# Keep placeholder directories trackable
+!logs/.gitkeep
+!reports/.gitkeep
