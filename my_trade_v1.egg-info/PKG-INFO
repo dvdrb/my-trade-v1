@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: my-trade-v1
+Version: 0.1.0
+Summary: Local-first Hyperliquid triangle breakout trading bot
+Requires-Python: <3.13,>=3.11
+Requires-Dist: loguru
+Requires-Dist: pydantic
+Requires-Dist: pydantic-settings
+Requires-Dist: python-dotenv
+Requires-Dist: pyyaml
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"

@@ -1,0 +1,29 @@
+{
+  "total_trades": 13,
+  "accepted_signals": 50,
+  "rejected_signals": 402,
+  "rejection_counts_by_reason": {
+    "trend is not bearish for short": 67,
+    "blocked by nearby opposite zone": 384,
+    "trend is not bullish for long": 104
+  },
+  "win_rate": 0.6923076923076923,
+  "average_r": 0.8398288095542163,
+  "expectancy": 0.8398288095542161,
+  "profit_factor": 3.562222028644251,
+  "max_drawdown": 0.001089300199813506,
+  "max_losing_streak": 1,
+  "performance_by_side": {
+    "long": {
+      "trades": 7,
+      "pnl": 5.814583800498732,
+      "average_r": 0.830654828642676
+    },
+    "short": {
+      "trades": 6,
+      "pnl": 5.1031907237060805,
+      "average_r": 0.8505317872843468
+    }
+  },
+  "performance_by_triangle_type": {}
+}

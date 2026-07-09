@@ -1,0 +1,28 @@
+[project]
+name = "my-trade-v1"
+version = "0.1.0"
+description = "Local-first Hyperliquid triangle breakout trading bot"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "loguru",
+  "pydantic",
+  "pydantic-settings",
+  "python-dotenv",
+  "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

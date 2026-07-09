@@ -1,0 +1,8 @@
+loguru
+pydantic
+pydantic-settings
+python-dotenv
+pyyaml
+
+[dev]
+pytest
