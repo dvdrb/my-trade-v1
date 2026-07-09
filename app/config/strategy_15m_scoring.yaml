@@ -11,7 +11,7 @@ strategy:
 
   scoring:
     use_scoring_model: true
-    min_trade_score: 50
+    min_trade_score: 0
     trend_as_hard_filter: false
     zone_as_hard_filter: false
 
@@ -70,6 +70,8 @@ risk:
       risk_percent: 0.003
     - min_score: 50
       risk_percent: 0.0015
+    - min_score: 0
+      risk_percent: 0.001
 
 paper:
   enabled: true

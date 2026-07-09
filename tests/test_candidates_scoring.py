@@ -83,11 +83,22 @@ def test_dynamic_risk_tier_selects_percent() -> None:
         {"min_score": 75, "risk_percent": 0.005},
         {"min_score": 60, "risk_percent": 0.003},
         {"min_score": 50, "risk_percent": 0.0015},
+        {"min_score": 0, "risk_percent": 0.001},
     ]
     assert risk_percent_for_score(80, config) == 0.005
     assert risk_percent_for_score(65, config) == 0.003
     assert risk_percent_for_score(55, config) == 0.0015
-    assert risk_percent_for_score(49, config) is None
+    assert risk_percent_for_score(49, config) == 0.001
+
+
+def test_scoring_weights_affect_total_score() -> None:
+    config = AppConfig()
+    candles = [c(i, 100 + i, 90 + i, close=95 + i) for i in range(25)]
+    plan = RiskPlan(102, 96, 114, 2.0, 1)
+    base = score_candidate(candidate(), candles, [], [], Side.LONG, plan, config)
+    config.strategy.scoring.weights.trend_quality = 0
+    weighted = score_candidate(candidate(), candles, [], [], Side.LONG, plan, config)
+    assert weighted.total_score < base.total_score
 
 
 def _band_pivots() -> list[Pivot]:

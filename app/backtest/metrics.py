@@ -12,6 +12,7 @@ def calculate_metrics(
     equity_curve: list[float] | None = None,
     open_trades: list[Trade] | None = None,
     funnel: dict[str, int] | None = None,
+    run_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     closed = [trade for trade in trades if trade.status == "closed"]
     wins = [trade for trade in closed if trade.pnl > 0]
@@ -36,12 +37,14 @@ def calculate_metrics(
         "skipped_already_in_position": 0,
         "skipped_pending_signal_exists": 0,
         "skipped_end_of_backtest": 0,
+        "skipped_actual_entry_invalid_rr": 0,
     }
     if funnel:
         funnel_metrics.update(funnel)
         funnel_metrics["accepted_signals"] = sum(1 for signal in signals if signal.decision.value == "accepted")
 
-    return {
+    summary = {
+        **(run_metadata or {}),
         "total_trades": len(closed),
         **funnel_metrics,
         "rejected_signals": sum(1 for signal in signals if signal.decision.value == "rejected"),
@@ -65,6 +68,8 @@ def calculate_metrics(
         "performance_by_triangle_cleanliness_bucket": _quality_bucket_performance(closed, "triangle_cleanliness_score"),
         "candidate_funnel": _candidate_funnel(signals),
     }
+    summary["score_bucket_trade_count"] = sum(bucket["trades"] for bucket in summary["score_bucket_performance"].values())
+    return summary
 
 
 def _max_drawdown(equity: list[float]) -> float:
@@ -123,7 +128,11 @@ def _profit_factor(trades: list[Trade]) -> float:
 
 
 def _score_bucket_performance(trades: list[Trade]) -> dict[str, dict[str, float]]:
-    return _bucket_performance(trades, lambda trade: trade.score_total, [(80, 100, "80_100"), (70, 79.9999, "70_79"), (60, 69.9999, "60_69"), (50, 59.9999, "50_59")])
+    return _bucket_performance(
+        trades,
+        lambda trade: trade.score_total,
+        [(80, 100, "80_100"), (70, 79.9999, "70_79"), (60, 69.9999, "60_69"), (50, 59.9999, "50_59"), (40, 49.9999, "40_49"), (0, 39.9999, "0_39")],
+    )
 
 
 def _quality_bucket_performance(trades: list[Trade], field_name: str) -> dict[str, dict[str, float]]:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.backtest.metrics import calculate_metrics
-from app.backtest.runner import _maybe_close_trade, _open_trade, run_backtest
+from app.backtest.runner import _maybe_close_trade, _open_trade, run_backtest, try_open_trade
 from app.config.settings import AppConfig
 from app.core.types import Candle, Decision, Side, Signal, Trade
 from app.data.db import connect, init_db
@@ -26,9 +26,9 @@ def test_backtest_sequential_replay_no_lookahead_and_next_candle_entry(tmp_path,
                 "1h",
                 Decision.ACCEPTED,
                 Side.LONG,
-                entry_price=100,
-                stop_loss=99,
-                take_profit=102,
+                    entry_price=100,
+                    stop_loss=99,
+                    take_profit=103,
                 reward_risk=2,
                 strategy_version="test",
                 triangle_type="ascending",
@@ -45,7 +45,7 @@ def test_backtest_sequential_replay_no_lookahead_and_next_candle_entry(tmp_path,
         result = run_backtest(repo, None, None, AppConfig(), "BTC", "1h")
     assert calls == [2, 3, 4]
     assert result.trades[0].entry_time == 3
-    assert result.trades[0].size == 5
+    assert round(result.trades[0].size, 6) == round(5 / (100.05 - 99), 6)
     assert result.trades[0].signal_time == 2
     assert result.trades[0].strategy_version == "test"
     assert result.trades[0].triangle_type == "ascending"
@@ -93,6 +93,9 @@ def test_metrics_and_report_files_generated(tmp_path, monkeypatch) -> None:
     assert metrics["total_pnl"] == 10
     assert metrics["performance_by_triangle_type"]["ascending"]["trades"] == 1
     assert metrics["score_bucket_performance"]["80_100"]["trades"] == 1
+    assert "40_49" in metrics["score_bucket_performance"]
+    assert "0_39" in metrics["score_bucket_performance"]
+    assert metrics["score_bucket_trade_count"] == metrics["closed_trades"]
     assert metrics["performance_by_trend_score_bucket"]["15_20"]["trades"] == 1
     assert metrics["performance_by_zone_score_bucket"]["15_20"]["trades"] == 1
     assert metrics["performance_by_risk_score_bucket"]["15_20"]["trades"] == 1
@@ -107,6 +110,26 @@ def test_metrics_and_report_files_generated(tmp_path, monkeypatch) -> None:
     assert (directory / "trades.csv").exists()
     assert (directory / "open_trades.csv").exists()
     assert (directory / "signals.csv").exists()
+
+
+def test_actual_entry_revalidation_skips_invalid_rr() -> None:
+    config = AppConfig()
+    config.risk.absolute_min_reward_risk = 1.2
+    signal = Signal("BTC", "1h", Decision.ACCEPTED, Side.LONG, entry_price=100, stop_loss=95, take_profit=106, strategy_version="test", position_size=1, risk_amount=5)
+    trade, reason = try_open_trade(signal, candle(2, open_=105), config)
+    assert trade is None
+    assert reason == "actual_entry_invalid_rr"
+
+
+def test_actual_entry_revalidation_recalculates_position_size() -> None:
+    config = AppConfig()
+    config.risk.absolute_min_reward_risk = 1.2
+    config.risk.slippage_percent = 0
+    signal = Signal("BTC", "1h", Decision.ACCEPTED, Side.LONG, entry_price=100, stop_loss=95, take_profit=115, strategy_version="test", position_size=99, risk_amount=10)
+    trade, reason = try_open_trade(signal, candle(2, open_=100), config)
+    assert reason is None
+    assert trade is not None
+    assert trade.size == 2
 
 
 def test_skipped_accepted_signals_and_open_trade_at_end_are_reported(tmp_path, monkeypatch) -> None:
@@ -145,7 +168,27 @@ def test_skipped_accepted_signals_and_open_trade_at_end_are_reported(tmp_path, m
     assert result.summary["skipped_pending_signal_exists"] == 0
     assert result.summary["skipped_end_of_backtest"] == 0
     assert result.open_trades[0].status == "open"
-    assert round(result.open_trades[0].pnl, 2) == 3.95
+    assert round(result.open_trades[0].pnl, 2) == 3.91
+
+
+def test_skipped_actual_entry_invalid_rr_appears_in_summary(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    db_path = tmp_path / "bot.sqlite3"
+    init_db(db_path)
+
+    def fake_evaluate(candles, config, symbol, timeframe, equity=None):
+        if len(candles) == 2:
+            return Signal("BTC", timeframe, Decision.ACCEPTED, Side.LONG, entry_price=100, stop_loss=95, take_profit=101, strategy_version="test", open_time=candles[-1].open_time, position_size=1, risk_amount=5)
+        return Signal("BTC", timeframe, Decision.NO_SETUP, strategy_version="test", open_time=candles[-1].open_time)
+
+    monkeypatch.setattr("app.backtest.runner.evaluate", fake_evaluate)
+    with connect(db_path) as connection:
+        repo = CandleRepository(connection)
+        repo.insert_many([candle(1), candle(2), candle(3, open_=100), candle(4)])
+        result = run_backtest(repo, None, None, AppConfig(), "BTC", "1h")
+
+    assert result.summary["skipped_actual_entry_invalid_rr"] == 1
+    assert result.summary["trades_opened"] == 0
 
 
 def test_pending_signal_at_end_is_reported_as_skipped(tmp_path, monkeypatch) -> None:
@@ -195,5 +238,28 @@ def test_15m_timeframe_passes_through_backtest_flow(tmp_path, monkeypatch) -> No
     with connect(db_path) as connection:
         repo = CandleRepository(connection)
         repo.insert_many([Candle("BTC", "15m", time, 1, 2, 0.5, 1.5) for time in [1, 2, 3]])
-        run_backtest(repo, None, None, AppConfig(), "BTC", "15m")
+        result = run_backtest(repo, None, None, AppConfig(), "BTC", "15m")
     assert seen == ["15m", "15m"]
+    assert result.summary["strategy_version"] == "triangle-trend-zones-v1"
+    assert result.summary["symbol"] == "BTC"
+    assert result.summary["timeframe"] == "15m"
+    assert result.summary["use_scoring_model"] is False
+    assert result.summary["min_trade_score"] == 50.0
+
+
+def test_scoring_candidate_funnel_invariants_and_bucket_sum() -> None:
+    signals = [
+        Signal("BTC", "15m", Decision.ACCEPTED, metadata={"triangle_candidates_found": 3, "breakout_candidates_found": 2, "scored_candidates": 2}),
+        Signal("BTC", "15m", Decision.REJECTED, metadata={"triangle_candidates_found": 1, "breakout_candidates_found": 1, "scored_candidates": 1, "rejected_by_score": 1}),
+    ]
+    trades = [
+        Trade("BTC", "15m", Side.LONG, 1, 100, 1, 95, 110, 2, 110, 10, 2, "closed", score_total=35),
+        Trade("BTC", "15m", Side.LONG, 3, 100, 1, 95, 110, 4, 95, -5, -1, "closed", score_total=45),
+    ]
+    metrics = calculate_metrics(trades, signals, run_metadata={"use_scoring_model": True})
+    funnel = metrics["candidate_funnel"]
+    assert funnel["accepted_signals"] <= funnel["scored_candidates"]
+    assert funnel["breakout_candidates_found"] <= funnel["triangle_candidates_found"]
+    assert metrics["score_bucket_trade_count"] == metrics["closed_trades"]
+    assert metrics["score_bucket_performance"]["0_39"]["trades"] == 1
+    assert metrics["score_bucket_performance"]["40_49"]["trades"] == 1

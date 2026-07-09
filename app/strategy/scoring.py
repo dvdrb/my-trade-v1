@@ -39,7 +39,14 @@ def score_candidate(
     zone_quality, zone_reasons, zone_penalties = _zone_quality(zones, breakout_side, risk_plan)
     risk_quality, risk_reasons, risk_penalties = _risk_quality(risk_plan, config)
 
-    total = triangle_quality + breakout_quality + trend_quality + zone_quality + risk_quality
+    weights = config.strategy.scoring.weights
+    total = (
+        triangle_quality / 20 * weights.triangle_quality
+        + breakout_quality / 20 * weights.breakout_quality
+        + trend_quality / 20 * weights.trend_quality
+        + zone_quality / 20 * weights.zone_quality
+        + risk_quality / 20 * weights.risk_quality
+    )
     return ScoreBreakdown(
         total_score=max(0.0, min(100.0, total)),
         triangle_quality=triangle_quality,

@@ -1,0 +1,249 @@
+{
+  "total_trades": 39,
+  "accepted_signals": 561,
+  "trades_opened": 39,
+  "closed_trades": 39,
+  "open_trades_at_end": 0,
+  "skipped_already_in_position": 522,
+  "skipped_pending_signal_exists": 0,
+  "skipped_end_of_backtest": 0,
+  "rejected_signals": 0,
+  "rejection_counts_by_reason": {},
+  "win_rate": 0.358974358974359,
+  "average_r": -0.1339723200120466,
+  "expectancy_r": -0.1339723200120466,
+  "average_pnl": -0.6010072629712098,
+  "expectancy_usd": -0.6010072629712098,
+  "total_pnl": -23.439283255877182,
+  "profit_factor": 0.8299707932750872,
+  "max_drawdown": 0.05723864515408354,
+  "max_losing_streak": 8,
+  "performance_by_side": {
+    "short": {
+      "trades": 29,
+      "win_rate": 0.4482758620689655,
+      "average_r": 0.13000639087301843,
+      "total_pnl": 25.389348825074673,
+      "profit_factor": 1.3180930416994983
+    },
+    "long": {
+      "trades": 10,
+      "win_rate": 0.1,
+      "average_r": -0.899510581578735,
+      "total_pnl": -48.828632080951856,
+      "profit_factor": 0.15866500186005028
+    }
+  },
+  "performance_by_triangle_type": {
+    "ascending": {
+      "trades": 15,
+      "win_rate": 0.26666666666666666,
+      "average_r": -0.4284406327250456,
+      "total_pnl": -23.359483144561803,
+      "profit_factor": 0.5800553291202077
+    },
+    "descending": {
+      "trades": 14,
+      "win_rate": 0.5,
+      "average_r": 0.27127473264721497,
+      "total_pnl": 15.054256143428596,
+      "profit_factor": 1.3420546146493433
+    },
+    "symmetrical": {
+      "trades": 10,
+      "win_rate": 0.3,
+      "average_r": -0.25961572466551414,
+      "total_pnl": -15.134056254743978,
+      "profit_factor": 0.6040075600788573
+    }
+  },
+  "score_bucket_performance": {
+    "80_100": {
+      "trades": 21,
+      "win_rate": 0.3333333333333333,
+      "average_r": -0.2229737407547574,
+      "total_pnl": -26.66852096056709,
+      "profit_factor": 0.6879861429185814
+    },
+    "70_79": {
+      "trades": 17,
+      "win_rate": 0.4117647058823529,
+      "average_r": 0.03961666227707443,
+      "total_pnl": 7.039788011749151,
+      "profit_factor": 1.144936091798923
+    },
+    "60_69": {
+      "trades": 1,
+      "win_rate": 0.0,
+      "average_r": -1.2159551833301743,
+      "total_pnl": -3.8105503070592355,
+      "profit_factor": 0.0
+    },
+    "50_59": {
+      "trades": 0,
+      "win_rate": 0.0,
+      "average_r": 0.0,
+      "total_pnl": 0.0,
+      "profit_factor": 0.0
+    }
+  },
+  "performance_by_score_bucket": {
+    "80_100": {
+      "trades": 21,
+      "win_rate": 0.3333333333333333,
+      "average_r": -0.2229737407547574,
+      "total_pnl": -26.66852096056709,
+      "profit_factor": 0.6879861429185814
+    },
+    "70_79": {
+      "trades": 17,
+      "win_rate": 0.4117647058823529,
+      "average_r": 0.03961666227707443,
+      "total_pnl": 7.039788011749151,
+      "profit_factor": 1.144936091798923
+    },
+    "60_69": {
+      "trades": 1,
+      "win_rate": 0.0,
+      "average_r": -1.2159551833301743,
+      "total_pnl": -3.8105503070592355,
+      "profit_factor": 0.0
+    },
+    "50_59": {
+      "trades": 0,
+      "win_rate": 0.0,
+      "average_r": 0.0,
+      "total_pnl": 0.0,
+      "profit_factor": 0.0
+    }
+  },
+  "performance_by_trend_score_bucket": {
+    "15_20": {
+      "trades": 24,
+      "win_rate": 0.375,
+      "average_r": -0.032376784487505174,
+      "total_pnl": -6.013064797407331,
+      "profit_factor": 0.9271189703883377
+    },
+    "10_14": {
+      "trades": 11,
+      "win_rate": 0.45454545454545453,
+      "average_r": 0.08894692217329238,
+      "total_pnl": 8.595522564732796,
+      "profit_factor": 1.2930874646449353
+    },
+    "5_9": {
+      "trades": 4,
+      "win_rate": 0.0,
+      "average_r": -1.356573449168977,
+      "total_pnl": -26.02174102320264,
+      "profit_factor": 0.0
+    },
+    "0_4": {
+      "trades": 0,
+      "win_rate": 0.0,
+      "average_r": 0.0,
+      "total_pnl": 0.0,
+      "profit_factor": 0.0
+    }
+  },
+  "performance_by_zone_score_bucket": {
+    "15_20": {
+      "trades": 13,
+      "win_rate": 0.3076923076923077,
+      "average_r": -0.3537334490523657,
+      "total_pnl": -26.623176368748886,
+      "profit_factor": 0.54830008324353
+    },
+    "10_14": {
+      "trades": 3,
+      "win_rate": 0.6666666666666666,
+      "average_r": 0.80674327134189,
+      "total_pnl": 12.248115337568368,
+      "profit_factor": 3.1179332155906994
+    },
+    "5_9": {
+      "trades": 23,
+      "win_rate": 0.34782608695652173,
+      "average_r": -0.13246154160064044,
+      "total_pnl": -9.064222224696671,
+      "profit_factor": 0.876055738256745
+    },
+    "0_4": {
+      "trades": 0,
+      "win_rate": 0.0,
+      "average_r": 0.0,
+      "total_pnl": 0.0,
+      "profit_factor": 0.0
+    }
+  },
+  "performance_by_risk_score_bucket": {
+    "15_20": {
+      "trades": 39,
+      "win_rate": 0.358974358974359,
+      "average_r": -0.1339723200120466,
+      "total_pnl": -23.439283255877182,
+      "profit_factor": 0.8299707932750872
+    },
+    "10_14": {
+      "trades": 0,
+      "win_rate": 0.0,
+      "average_r": 0.0,
+      "total_pnl": 0.0,
+      "profit_factor": 0.0
+    },
+    "5_9": {
+      "trades": 0,
+      "win_rate": 0.0,
+      "average_r": 0.0,
+      "total_pnl": 0.0,
+      "profit_factor": 0.0
+    },
+    "0_4": {
+      "trades": 0,
+      "win_rate": 0.0,
+      "average_r": 0.0,
+      "total_pnl": 0.0,
+      "profit_factor": 0.0
+    }
+  },
+  "performance_by_triangle_cleanliness_bucket": {
+    "15_20": {
+      "trades": 39,
+      "win_rate": 0.358974358974359,
+      "average_r": -0.1339723200120466,
+      "total_pnl": -23.439283255877182,
+      "profit_factor": 0.8299707932750872
+    },
+    "10_14": {
+      "trades": 0,
+      "win_rate": 0.0,
+      "average_r": 0.0,
+      "total_pnl": 0.0,
+      "profit_factor": 0.0
+    },
+    "5_9": {
+      "trades": 0,
+      "win_rate": 0.0,
+      "average_r": 0.0,
+      "total_pnl": 0.0,
+      "profit_factor": 0.0
+    },
+    "0_4": {
+      "trades": 0,
+      "win_rate": 0.0,
+      "average_r": 0.0,
+      "total_pnl": 0.0,
+      "profit_factor": 0.0
+    }
+  },
+  "candidate_funnel": {
+    "candles_processed": 5004,
+    "triangle_candidates_found": 11783,
+    "breakout_candidates_found": 1659,
+    "scored_candidates": 1659,
+    "accepted_signals": 561,
+    "rejected_by_absolute_risk": 0,
+    "rejected_by_score": 0
+  }
+}

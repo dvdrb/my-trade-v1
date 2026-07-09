@@ -36,6 +36,7 @@ def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | 
         "skipped_already_in_position": 0,
         "skipped_pending_signal_exists": 0,
         "skipped_end_of_backtest": 0,
+        "skipped_actual_entry_invalid_rr": 0,
     }
 
     for index, candle in enumerate(candles):
@@ -51,8 +52,12 @@ def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | 
                 open_trade = None
 
         if pending_signal is not None and open_trade is None:
-            open_trade = _open_trade(pending_signal, candle, config.risk.slippage_percent)
-            funnel["trades_opened"] += 1
+            open_trade, skip_reason = try_open_trade(pending_signal, candle, config)
+            if open_trade is None:
+                if skip_reason == "actual_entry_invalid_rr":
+                    funnel["skipped_actual_entry_invalid_rr"] += 1
+            else:
+                funnel["trades_opened"] += 1
             pending_signal = None
 
         if index > 0:
@@ -76,23 +81,61 @@ def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | 
     funnel["open_trades_at_end"] = len(open_trades_at_end)
 
     run_id = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
-    summary = calculate_metrics(trades, signals, [item[1] for item in equity_curve], open_trades_at_end, funnel)
+    summary = calculate_metrics(
+        trades,
+        signals,
+        [item[1] for item in equity_curve],
+        open_trades_at_end,
+        funnel,
+        {
+            "strategy_version": config.strategy.version,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "use_scoring_model": config.strategy.scoring.use_scoring_model,
+            "min_trade_score": config.strategy.scoring.min_trade_score,
+        },
+    )
     write_report(run_id, summary, trades, open_trades_at_end, signals, equity_curve)
     return BacktestResult(run_id, signals, trades, open_trades_at_end, summary)
 
 
 def _open_trade(signal: Signal, candle: Candle, slippage_percent: float) -> Trade:
+    trade, skip_reason = _build_trade(signal, candle, slippage_percent, None)
+    if trade is None:
+        raise ValueError(skip_reason or "invalid trade")
+    return trade
+
+
+def try_open_trade(signal: Signal, candle: Candle, config: AppConfig) -> tuple[Trade | None, str | None]:
+    return _build_trade(signal, candle, config.risk.slippage_percent, config.risk.absolute_min_reward_risk)
+
+
+def _build_trade(signal: Signal, candle: Candle, slippage_percent: float, absolute_min_reward_risk: float | None) -> tuple[Trade | None, str | None]:
     assert signal.side and signal.stop_loss is not None and signal.take_profit is not None
-    if signal.position_size is None:
-        raise ValueError("accepted signal is missing position_size")
+    if signal.risk_amount is None and signal.position_size is None:
+        return None, "accepted signal is missing risk sizing"
     entry = candle.open * (1 + slippage_percent if signal.side == Side.LONG else 1 - slippage_percent)
+    if signal.side == Side.LONG:
+        actual_risk = entry - signal.stop_loss
+        actual_reward = signal.take_profit - entry
+    else:
+        actual_risk = signal.stop_loss - entry
+        actual_reward = entry - signal.take_profit
+    if actual_risk <= 0:
+        return None, "actual_entry_invalid_rr"
+    actual_rr = actual_reward / actual_risk
+    if absolute_min_reward_risk is not None and actual_rr < absolute_min_reward_risk:
+        return None, "actual_entry_invalid_rr"
+    size = signal.risk_amount / actual_risk if signal.risk_amount is not None else signal.position_size
+    if size is None or size <= 0:
+        return None, "accepted signal is missing position_size"
     return Trade(
         signal.symbol,
         signal.timeframe,
         signal.side,
         candle.open_time,
         entry,
-        signal.position_size,
+        size,
         signal.stop_loss,
         signal.take_profit,
         signal_time=signal.open_time,
@@ -109,7 +152,7 @@ def _open_trade(signal: Signal, candle: Candle, slippage_percent: float) -> Trad
         triangle_max_wick_violation=_metadata_float(signal, "triangle_max_wick_violation"),
         triangle_max_close_violation=_metadata_float(signal, "triangle_max_close_violation"),
         triangle_line_tolerance_used=_metadata_float(signal, "triangle_line_tolerance_used"),
-    )
+    ), None
 
 
 def _maybe_close_trade(trade: Trade, candle: Candle, fee_percent: float, slippage_percent: float) -> Trade | None:
