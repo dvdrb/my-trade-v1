@@ -1,0 +1,2 @@
+symbol,timeframe,side,entry_time,entry_price,size,stop_loss,take_profit,exit_time,exit_price,pnl,r_multiple,status,signal_time,strategy_version,triangle_type,risk_amount
+BTC,1h,short,1780534800000,63280.344000000005,0.0012818129599534598,67442.0,55046.0,1783616400000,62786.0,0.633656545875239,0.11878540657853631,open,1780531200000,triangle-trend-zones-v1,symmetrical,5.296451150527696

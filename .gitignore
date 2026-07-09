@@ -26,7 +26,6 @@ data/*.sqlite
 data/*.sqlite3
 data/*.db
 logs/*
-reports/backtests/
 
 # Keep placeholder directories trackable
 !logs/.gitkeep

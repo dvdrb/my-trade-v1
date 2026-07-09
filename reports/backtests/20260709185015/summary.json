@@ -1,0 +1,64 @@
+{
+  "total_trades": 13,
+  "accepted_signals": 50,
+  "trades_opened": 14,
+  "closed_trades": 13,
+  "open_trades_at_end": 1,
+  "skipped_already_in_position": 36,
+  "skipped_pending_signal_exists": 0,
+  "skipped_end_of_backtest": 0,
+  "rejected_signals": 402,
+  "rejection_counts_by_reason": {
+    "trend is not bearish for short": 67,
+    "blocked by nearby opposite zone": 384,
+    "trend is not bullish for long": 104
+  },
+  "win_rate": 0.6923076923076923,
+  "average_r": 0.8398288095542162,
+  "expectancy_r": 0.8398288095542162,
+  "average_pnl": 4.560786931195296,
+  "expectancy_usd": 4.560786931195296,
+  "total_pnl": 59.29023010553885,
+  "profit_factor": 3.6355171310505283,
+  "max_drawdown": 0.005691279411828306,
+  "max_losing_streak": 1,
+  "performance_by_side": {
+    "long": {
+      "trades": 7,
+      "win_rate": 0.7142857142857143,
+      "average_r": 0.8306548286426757,
+      "total_pnl": 32.30142945079328,
+      "profit_factor": 3.7809101576708084
+    },
+    "short": {
+      "trades": 6,
+      "win_rate": 0.6666666666666666,
+      "average_r": 0.8505317872843466,
+      "total_pnl": 26.988800654745578,
+      "profit_factor": 3.480313676682639
+    }
+  },
+  "performance_by_triangle_type": {
+    "ascending": {
+      "trades": 7,
+      "win_rate": 0.7142857142857143,
+      "average_r": 0.8825615648487055,
+      "total_pnl": 33.79245854436333,
+      "profit_factor": 3.968813612223137
+    },
+    "descending": {
+      "trades": 2,
+      "win_rate": 1.0,
+      "average_r": 1.9221070799797024,
+      "total_pnl": 19.862655802253627,
+      "profit_factor": 19.862655802253627
+    },
+    "symmetrical": {
+      "trades": 4,
+      "win_rate": 0.5,
+      "average_r": 0.2239073525761166,
+      "total_pnl": 5.635115758921897,
+      "profit_factor": 1.507022110817561
+    }
+  }
+}
