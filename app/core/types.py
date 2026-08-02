@@ -116,3 +116,17 @@ class Trade:
     triangle_max_close_violation: float | None = None
     triangle_line_tolerance_used: float | None = None
     nested_metadata: dict[str, object] = field(default_factory=dict)
+    score_parent_4h_structure: float | None = None
+    score_parent_1h_structure: float | None = None
+    score_nested_triangle: float | None = None
+    score_entry_breakout: float | None = None
+    score_mtf_zones: float | None = None
+    parent_4h_triangle_type: str | None = None
+    parent_1h_triangle_type: str | None = None
+    child_triangle_type: str | None = None
+    parent_timeframe_alignment: str | None = None
+    nested_context: str | None = None
+    entry_trend_direction: str | None = None
+    local_trend_direction: str | None = None
+    regime_trend_direction: str | None = None
+    mtf_zone_context: str | None = None

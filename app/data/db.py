@@ -87,6 +87,16 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
         _add_column(connection, "trades", "triangle_max_close_violation", "REAL")
         _add_column(connection, "trades", "triangle_line_tolerance_used", "REAL")
         _add_column(connection, "trades", "nested_metadata", "TEXT NOT NULL DEFAULT '{}'")
+        for column, definition in (
+            ("score_parent_4h_structure", "REAL"), ("score_parent_1h_structure", "REAL"),
+            ("score_nested_triangle", "REAL"), ("score_entry_breakout", "REAL"),
+            ("score_mtf_zones", "REAL"), ("parent_4h_triangle_type", "TEXT"),
+            ("parent_1h_triangle_type", "TEXT"), ("child_triangle_type", "TEXT"),
+            ("parent_timeframe_alignment", "TEXT"), ("nested_context", "TEXT"),
+            ("entry_trend_direction", "TEXT"), ("local_trend_direction", "TEXT"),
+            ("regime_trend_direction", "TEXT"), ("mtf_zone_context", "TEXT"),
+        ):
+            _add_column(connection, "trades", column, definition)
 
 
 def _add_column(connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:

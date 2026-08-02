@@ -74,8 +74,16 @@ def calculate_metrics(
         "performance_by_4h_trend": _nested_group_performance(closed, "regime_trend_direction"),
         "performance_by_1h_trend": _nested_group_performance(closed, "local_trend_direction"),
         "performance_by_mtf_zone_context": _nested_group_performance(closed, "mtf_zone_context"),
-        "candidate_funnel": _candidate_funnel(signals),
+        "performance_by_parent_4h_score_bucket": _quality_bucket_performance(closed, "score_parent_4h_structure"),
+        "performance_by_parent_1h_score_bucket": _quality_bucket_performance(closed, "score_parent_1h_structure"),
+        "performance_by_nested_triangle_score_bucket": _quality_bucket_performance(closed, "score_nested_triangle"),
+        "performance_by_entry_breakout_score_bucket": _quality_bucket_performance(closed, "score_entry_breakout"),
+        "performance_by_mtf_zone_score_bucket": _quality_bucket_performance(closed, "score_mtf_zones"),
     }
+    summary["legacy_candidate_funnel"] = _legacy_candidate_funnel(signals)
+    summary["nested_candidate_funnel"] = _nested_candidate_funnel(signals)
+    summary["candidate_funnel"] = summary["nested_candidate_funnel"] if run_metadata and run_metadata.get("use_nested_mtf") else summary["legacy_candidate_funnel"]
+    summary["mtf_zone_diagnostics"] = _mtf_zone_diagnostics(signals)
     summary["score_bucket_trade_count"] = sum(bucket["trades"] for bucket in summary["score_bucket_performance"].values())
     return summary
 
@@ -169,8 +177,8 @@ def _bucket_performance(trades: list[Trade], value_func, buckets: list[tuple[flo
     return result
 
 
-def _candidate_funnel(signals: list[Signal]) -> dict[str, int]:
-    result = {
+def _legacy_candidate_funnel(signals: list[Signal]) -> dict[str, int]:
+    return {
         "candles_processed": len(signals),
         "triangle_candidates_found": sum(int(signal.metadata.get("triangle_candidates_found", 0)) for signal in signals),
         "breakout_candidates_found": sum(int(signal.metadata.get("breakout_candidates_found", 0)) for signal in signals),
@@ -179,11 +187,35 @@ def _candidate_funnel(signals: list[Signal]) -> dict[str, int]:
         "rejected_by_absolute_risk": sum(int(signal.metadata.get("rejected_by_absolute_risk", 0)) for signal in signals),
         "rejected_by_score": sum(int(signal.metadata.get("rejected_by_score", 0)) for signal in signals),
     }
-    for key in ("regime_triangles_found", "local_triangles_found", "entry_triangles_found", "nested_setups_found", "regime_nested_setups_found", "local_nested_setups_found", "entry_breakouts_found", "scored_nested_setups"):
-        result[key] = sum(int(signal.metadata.get(key, 0)) for signal in signals)
-    result["rejected_by_mtf_zone"] = sum(int(signal.metadata.get("rejected_by_mtf_zone", 0)) for signal in signals)
+def _nested_candidate_funnel(signals: list[Signal]) -> dict[str, int]:
+    keys = ("regime_triangles_found", "local_triangles_found", "entry_triangles_found", "nested_setups_found", "regime_nested_setups_found", "local_nested_setups_found", "entry_breakouts_found", "scored_nested_setups", "rejected_by_absolute_risk", "rejected_by_score", "rejected_by_mtf_zone", "entry_breakouts_with_4h_parent", "entry_breakouts_with_1h_parent", "entry_breakouts_with_both_parents", "entry_breakouts_with_1h_only", "entry_breakouts_with_4h_only", "entry_breakouts_without_parent", "4h_parent_found_but_zone_blocked", "4h_parent_found_but_lower_score", "4h_parent_found_but_not_nested", "no_4h_parent_found")
+    result = {"candles_processed": len(signals), "accepted_signals": sum(1 for signal in signals if signal.decision.value == "accepted")}
+    result.update({key: sum(int(signal.metadata.get(key, 0)) for signal in signals) for key in keys})
     return result
 
 
+def _mtf_zone_diagnostics(signals: list[Signal]) -> dict[str, Any]:
+    return {
+        "blocked_mtf_zone_setups": sum(int(signal.metadata.get("blocked_mtf_zone_setups", 0)) for signal in signals),
+        "blocked_mtf_zone_by_side": _sum_metadata_counters(signals, "blocked_mtf_zone_by_side"),
+        "blocked_mtf_zone_by_timeframe": _sum_metadata_counters(signals, "blocked_mtf_zone_by_timeframe"),
+        "blocked_mtf_zone_by_parent_alignment": _sum_metadata_counters(signals, "blocked_mtf_zone_by_parent_alignment"),
+        "blocked_mtf_zone_by_child_triangle_type": _sum_metadata_counters(signals, "blocked_mtf_zone_by_child_triangle_type"),
+        "blocked_mtf_zone_by_score_bucket": _sum_metadata_counters(signals, "blocked_mtf_zone_by_score_bucket"),
+    }
+
+
+def _sum_metadata_counters(signals: list[Signal], key: str) -> dict[str, int]:
+    total: Counter[str] = Counter()
+    for signal in signals:
+        value = signal.metadata.get(key, {})
+        if isinstance(value, dict):
+            total.update({str(item): int(count) for item, count in value.items() if isinstance(count, int | float)})
+    return dict(total)
+
+
 def _nested_group_performance(trades: list[Trade], key: str) -> dict[str, dict[str, float]]:
-    return _group_performance([trade for trade in trades if trade.nested_metadata.get(key) is not None], lambda trade: str(trade.nested_metadata[key]))
+    def value(trade: Trade) -> object | None:
+        return getattr(trade, key, None) if getattr(trade, key, None) is not None else trade.nested_metadata.get(key)
+
+    return _group_performance([trade for trade in trades if value(trade) is not None], lambda trade: str(value(trade)))

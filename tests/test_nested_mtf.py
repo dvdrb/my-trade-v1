@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from app.backtest.metrics import calculate_metrics
+from app.backtest.runner import _build_trade
 from app.backtest.runner import closed_candles_as_of
 from app.config.settings import load_config
 from app.core.types import Candle, Side, Trade, Triangle
+from app.core.types import Decision, Signal
 from app.strategy.candidates import TriangleCandidate
 from app.strategy.nesting import is_child_inside_parent, score_nested_relationship
-from app.strategy.nested import _mtf_zone_score
+from app.strategy.nested import _mtf_zone_score, _record_parent_diagnostics, _should_hard_reject_zone
 from app.strategy.risk import RiskPlan
 from app.core.types import StrongZone
 
@@ -25,6 +29,14 @@ def test_nested_mtf_config_loads() -> None:
     assert (config.market.timeframe, config.market.entry_timeframe, config.market.local_timeframe, config.market.regime_timeframe) == ("15m", "15m", "1h", "4h")
     assert config.strategy.scoring.use_nested_mtf is True
     assert config.strategy.scoring.nested_regime_tolerance_percent == 0.01
+
+
+def test_strict_and_penalty_configs_toggle_mtf_zone_hard_filter() -> None:
+    strict = load_config("app/config/strategy_nested_mtf_strict_zones.yaml")
+    penalty = load_config("app/config/strategy_nested_mtf_zone_penalty.yaml")
+    metadata = {"mtf_opposite_zone_before_target": True}
+    assert _should_hard_reject_zone(metadata, strict)
+    assert not _should_hard_reject_zone(metadata, penalty)
 
 
 def test_closed_candles_as_of_excludes_unfinished_parent_candles() -> None:
@@ -65,7 +77,57 @@ def test_nested_report_sections_exist() -> None:
 
 def test_higher_timeframe_zones_have_larger_effect() -> None:
     risk = RiskPlan(100, 95, 110, 2, 1)
-    score_without, _ = _mtf_zone_score([], [], [], Side.LONG, risk)
-    score_with_4h, _ = _mtf_zone_score([StrongZone("support", 90, 99, 2, 2)], [], [], Side.LONG, risk)
-    score_with_15m, _ = _mtf_zone_score([], [], [StrongZone("support", 90, 99, 2, 2)], Side.LONG, risk)
+    score_without, _, _ = _mtf_zone_score([], [], [], Side.LONG, risk)
+    score_with_4h, _, _ = _mtf_zone_score([StrongZone("support", 90, 99, 2, 2)], [], [], Side.LONG, risk)
+    score_with_15m, _, _ = _mtf_zone_score([], [], [StrongZone("support", 90, 99, 2, 2)], Side.LONG, risk)
     assert score_with_4h > score_with_15m > score_without
+
+
+def test_nested_funnel_and_zone_diagnostics_do_not_use_legacy_zero_fields() -> None:
+    signal = Signal("BTC", "15m", Decision.REJECTED, metadata={
+        "regime_triangles_found": 1, "local_triangles_found": 2, "entry_triangles_found": 3,
+        "nested_setups_found": 2, "entry_breakouts_found": 1, "scored_nested_setups": 1,
+        "rejected_by_mtf_zone": 1, "blocked_mtf_zone_setups": 1,
+        "blocked_mtf_zone_by_side": {"long": 1}, "blocked_mtf_zone_by_timeframe": {"4h": 1},
+        "blocked_mtf_zone_by_parent_alignment": {"both": 1},
+        "blocked_mtf_zone_by_child_triangle_type": {"ascending": 1},
+        "blocked_mtf_zone_by_score_bucket": {"60_69": 1},
+    })
+    summary = calculate_metrics([], [signal], run_metadata={"use_nested_mtf": True})
+    assert "triangle_candidates_found" not in summary["candidate_funnel"]
+    assert summary["nested_candidate_funnel"]["entry_triangles_found"] == 3
+    assert summary["mtf_zone_diagnostics"]["blocked_mtf_zone_by_timeframe"] == {"4h": 1}
+
+
+def test_blocked_zone_details_include_timeframe_and_distances() -> None:
+    risk = RiskPlan(100, 95, 110, 2, 1)
+    _, _, blocks = _mtf_zone_score([StrongZone("resistance", 103, 104, 2, 2)], [], [], Side.LONG, risk)
+    assert blocks == [{"timeframe": "4h", "zone_kind": "resistance", "distance_to_entry_r": 0.6, "distance_to_target_r": 1.4}]
+
+
+def test_4h_parent_diagnostics_are_counted() -> None:
+    parent = _candidate(0, 10, 0, 10_000)
+    funnel: dict[str, object] = {key: 0 for key in ("entry_breakouts_with_4h_parent", "entry_breakouts_with_1h_parent", "entry_breakouts_with_both_parents", "entry_breakouts_with_1h_only", "entry_breakouts_with_4h_only", "entry_breakouts_without_parent", "4h_parent_found_but_not_nested", "no_4h_parent_found")}
+    _record_parent_diagnostics(funnel, parent, None, True)
+    _record_parent_diagnostics(funnel, None, None, False)
+    assert funnel["entry_breakouts_with_4h_only"] == 1
+    assert funnel["entry_breakouts_without_parent"] == 1
+    assert funnel["no_4h_parent_found"] == 1
+
+
+def test_nested_score_components_are_exported_to_trade() -> None:
+    signal = Signal("BTC", "15m", Decision.ACCEPTED, Side.LONG, entry_price=100, stop_loss=95, take_profit=110, position_size=1, risk_amount=5, metadata={
+        "score_parent_4h_structure": 20, "score_parent_1h_structure": 15,
+        "score_nested_triangle": 20, "score_entry_breakout": 10, "score_mtf_zones": 18,
+        "score_risk_quality": 10, "parent_4h_triangle_type": "ascending",
+        "parent_1h_triangle_type": "symmetrical", "child_triangle_type": "ascending",
+        "parent_timeframe_alignment": "both", "nested_context": "nested child aligned with parent",
+        "entry_trend_direction": "bullish", "local_trend_direction": "bullish",
+        "regime_trend_direction": "bullish", "mtf_zone_context": "4h favorable zone",
+    })
+    trade, reason = _build_trade(signal, _candle(1), 0, None)
+    assert reason is None and trade is not None
+    assert trade.score_parent_4h_structure == 20
+    assert trade.parent_timeframe_alignment == "both"
+    summary = calculate_metrics([replace(trade, status="closed")], [], run_metadata={"use_nested_mtf": True})
+    assert summary["performance_by_parent_4h_score_bucket"]["15_20"]["trades"] == 1

@@ -106,8 +106,13 @@ class TradeRepository:
              triangle_type, risk_amount, score_total, score_trend_quality, score_zone_quality,
              score_risk_quality, triangle_cleanliness_score, triangle_wick_violation_count,
              triangle_close_violation_count, triangle_max_wick_violation,
-             triangle_max_close_violation, triangle_line_tolerance_used, nested_metadata)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             triangle_max_close_violation, triangle_line_tolerance_used, nested_metadata,
+             score_parent_4h_structure, score_parent_1h_structure, score_nested_triangle,
+             score_entry_breakout, score_mtf_zones, parent_4h_triangle_type,
+             parent_1h_triangle_type, child_triangle_type, parent_timeframe_alignment,
+             nested_context, entry_trend_direction, local_trend_direction,
+             regime_trend_direction, mtf_zone_context)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 trade.symbol,
@@ -138,6 +143,20 @@ class TradeRepository:
                 trade.triangle_max_close_violation,
                 trade.triangle_line_tolerance_used,
                 json.dumps(trade.nested_metadata),
+                trade.score_parent_4h_structure,
+                trade.score_parent_1h_structure,
+                trade.score_nested_triangle,
+                trade.score_entry_breakout,
+                trade.score_mtf_zones,
+                trade.parent_4h_triangle_type,
+                trade.parent_1h_triangle_type,
+                trade.child_triangle_type,
+                trade.parent_timeframe_alignment,
+                trade.nested_context,
+                trade.entry_trend_direction,
+                trade.local_trend_direction,
+                trade.regime_trend_direction,
+                trade.mtf_zone_context,
             ),
         )
         self.connection.commit()

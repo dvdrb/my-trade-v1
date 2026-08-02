@@ -180,6 +180,20 @@ def _build_trade(signal: Signal, candle: Candle, slippage_percent: float, absolu
         triangle_max_close_violation=_metadata_float(signal, "triangle_max_close_violation"),
         triangle_line_tolerance_used=_metadata_float(signal, "triangle_line_tolerance_used"),
         nested_metadata={key: value for key, value in signal.metadata.items() if key in {"nested_context", "parent_timeframe_alignment", "parent_4h_triangle_type", "parent_1h_triangle_type", "child_triangle_type", "regime_trend_direction", "local_trend_direction", "mtf_zone_context"}},
+        score_parent_4h_structure=_metadata_float(signal, "score_parent_4h_structure"),
+        score_parent_1h_structure=_metadata_float(signal, "score_parent_1h_structure"),
+        score_nested_triangle=_metadata_float(signal, "score_nested_triangle"),
+        score_entry_breakout=_metadata_float(signal, "score_entry_breakout"),
+        score_mtf_zones=_metadata_float(signal, "score_mtf_zones"),
+        parent_4h_triangle_type=_metadata_str(signal, "parent_4h_triangle_type"),
+        parent_1h_triangle_type=_metadata_str(signal, "parent_1h_triangle_type"),
+        child_triangle_type=_metadata_str(signal, "child_triangle_type"),
+        parent_timeframe_alignment=_metadata_str(signal, "parent_timeframe_alignment"),
+        nested_context=_metadata_str(signal, "nested_context"),
+        entry_trend_direction=_metadata_str(signal, "entry_trend_direction"),
+        local_trend_direction=_metadata_str(signal, "local_trend_direction"),
+        regime_trend_direction=_metadata_str(signal, "regime_trend_direction"),
+        mtf_zone_context=_metadata_str(signal, "mtf_zone_context"),
     ), None
 
 
@@ -234,6 +248,20 @@ def _maybe_close_trade(trade: Trade, candle: Candle, fee_percent: float, slippag
         trade.triangle_max_close_violation,
         trade.triangle_line_tolerance_used,
         trade.nested_metadata,
+        trade.score_parent_4h_structure,
+        trade.score_parent_1h_structure,
+        trade.score_nested_triangle,
+        trade.score_entry_breakout,
+        trade.score_mtf_zones,
+        trade.parent_4h_triangle_type,
+        trade.parent_1h_triangle_type,
+        trade.child_triangle_type,
+        trade.parent_timeframe_alignment,
+        trade.nested_context,
+        trade.entry_trend_direction,
+        trade.local_trend_direction,
+        trade.regime_trend_direction,
+        trade.mtf_zone_context,
     )
 
 
@@ -274,6 +302,20 @@ def _mark_unrealized(trade: Trade, candle: Candle) -> Trade:
         trade.triangle_max_close_violation,
         trade.triangle_line_tolerance_used,
         trade.nested_metadata,
+        trade.score_parent_4h_structure,
+        trade.score_parent_1h_structure,
+        trade.score_nested_triangle,
+        trade.score_entry_breakout,
+        trade.score_mtf_zones,
+        trade.parent_4h_triangle_type,
+        trade.parent_1h_triangle_type,
+        trade.child_triangle_type,
+        trade.parent_timeframe_alignment,
+        trade.nested_context,
+        trade.entry_trend_direction,
+        trade.local_trend_direction,
+        trade.regime_trend_direction,
+        trade.mtf_zone_context,
     )
 
 
@@ -285,3 +327,8 @@ def _metadata_float(signal: Signal, key: str) -> float | None:
 def _metadata_int(signal: Signal, key: str) -> int | None:
     value = signal.metadata.get(key)
     return int(value) if isinstance(value, int | float) else None
+
+
+def _metadata_str(signal: Signal, key: str) -> str | None:
+    value = signal.metadata.get(key)
+    return value if isinstance(value, str) else None

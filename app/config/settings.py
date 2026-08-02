@@ -61,6 +61,7 @@ class ScoringConfig(BaseModel):
     use_scoring_model: bool = False
     use_nested_mtf: bool = False
     nested_regime_tolerance_percent: float = 0.01
+    mtf_zone_as_hard_filter: bool = False
     min_trade_score: float = 50.0
     trend_as_hard_filter: bool = True
     zone_as_hard_filter: bool = True
