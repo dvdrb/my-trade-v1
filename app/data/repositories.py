@@ -106,8 +106,8 @@ class TradeRepository:
              triangle_type, risk_amount, score_total, score_trend_quality, score_zone_quality,
              score_risk_quality, triangle_cleanliness_score, triangle_wick_violation_count,
              triangle_close_violation_count, triangle_max_wick_violation,
-             triangle_max_close_violation, triangle_line_tolerance_used)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             triangle_max_close_violation, triangle_line_tolerance_used, nested_metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 trade.symbol,
@@ -137,6 +137,7 @@ class TradeRepository:
                 trade.triangle_max_wick_violation,
                 trade.triangle_max_close_violation,
                 trade.triangle_line_tolerance_used,
+                json.dumps(trade.nested_metadata),
             ),
         )
         self.connection.commit()

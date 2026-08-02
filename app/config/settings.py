@@ -13,6 +13,9 @@ from pydantic import BaseModel, Field
 class MarketConfig(BaseModel):
     symbols: list[str] = Field(default_factory=lambda: ["BTC"])
     timeframe: str = "1h"
+    entry_timeframe: str | None = None
+    local_timeframe: str | None = None
+    regime_timeframe: str | None = None
     warmup_candles: int = 300
 
 
@@ -56,6 +59,8 @@ class ScoringWeights(BaseModel):
 
 class ScoringConfig(BaseModel):
     use_scoring_model: bool = False
+    use_nested_mtf: bool = False
+    nested_regime_tolerance_percent: float = 0.01
     min_trade_score: float = 50.0
     trend_as_hard_filter: bool = True
     zone_as_hard_filter: bool = True

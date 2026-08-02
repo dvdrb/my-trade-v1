@@ -115,3 +115,4 @@ class Trade:
     triangle_max_wick_violation: float | None = None
     triangle_max_close_violation: float | None = None
     triangle_line_tolerance_used: float | None = None
+    nested_metadata: dict[str, object] = field(default_factory=dict)

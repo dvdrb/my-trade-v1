@@ -86,6 +86,7 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
         _add_column(connection, "trades", "triangle_max_wick_violation", "REAL")
         _add_column(connection, "trades", "triangle_max_close_violation", "REAL")
         _add_column(connection, "trades", "triangle_line_tolerance_used", "REAL")
+        _add_column(connection, "trades", "nested_metadata", "TEXT NOT NULL DEFAULT '{}'")
 
 
 def _add_column(connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:

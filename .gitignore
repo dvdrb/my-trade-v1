@@ -26,6 +26,12 @@ data/*.sqlite
 data/*.sqlite3
 data/*.db
 logs/*
+reports/backtests/
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+coverage.xml
+htmlcov/
 
 # Keep placeholder directories trackable
 !logs/.gitkeep

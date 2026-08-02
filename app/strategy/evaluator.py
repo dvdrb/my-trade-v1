@@ -10,11 +10,17 @@ from app.strategy.scoring import ScoreBreakdown, risk_percent_for_score, score_c
 from app.strategy.trend import ema_trend, structure_trend
 from app.strategy.triangle import detect_triangle
 from app.strategy.zones import blocking_opposite_zone, build_zones
+from app.strategy.context import MarketContext
 
 
-def evaluate(candles: list[Candle], config: AppConfig, symbol: str | None = None, timeframe: str | None = None, equity: float | None = None) -> Signal:
+def evaluate(candles: list[Candle], config: AppConfig, symbol: str | None = None, timeframe: str | None = None, equity: float | None = None, context: MarketContext | None = None) -> Signal:
     actual_symbol = symbol or (candles[-1].symbol if candles else config.market.symbols[0])
     actual_timeframe = timeframe or (candles[-1].timeframe if candles else config.market.timeframe)
+    if config.strategy.scoring.use_nested_mtf:
+        from app.strategy.nested import evaluate_nested_mtf
+
+        nested_context = context or MarketContext(actual_symbol, actual_timeframe, config.market.local_timeframe or actual_timeframe, config.market.regime_timeframe or actual_timeframe, candles, candles, candles)
+        return evaluate_nested_mtf(nested_context, config, equity if equity is not None else config.risk.starting_balance)
     if len(candles) < config.strategy.triangle.min_candles + config.strategy.pivots.right + 2:
         return Signal(actual_symbol, actual_timeframe, Decision.NO_SETUP, reasons=["not enough candles"], strategy_version=config.strategy.version)
 

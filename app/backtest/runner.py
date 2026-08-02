@@ -9,6 +9,18 @@ from app.config.settings import AppConfig
 from app.core.types import Candle, Decision, Side, Signal, Trade
 from app.data.repositories import CandleRepository, SignalRepository, TradeRepository
 from app.strategy.evaluator import evaluate
+from app.strategy.context import MarketContext
+
+
+_TIMEFRAME_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
+
+
+def closed_candles_as_of(candles: list[Candle], timestamp: int, timeframe: str) -> list[Candle]:
+    """Return only candles whose close is known at ``timestamp``; missing close times use the timeframe."""
+    duration = _TIMEFRAME_MS.get(timeframe)
+    if duration is None:
+        raise ValueError(f"unsupported timeframe: {timeframe}")
+    return [candle for candle in candles if (candle.close_time if candle.close_time is not None else candle.open_time + duration) <= timestamp]
 
 
 @dataclass(frozen=True)
@@ -22,6 +34,11 @@ class BacktestResult:
 
 def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | None, trade_repo: TradeRepository | None, config: AppConfig, symbol: str, timeframe: str) -> BacktestResult:
     candles = candle_repo.all(symbol, timeframe)
+    entry_timeframe = config.market.entry_timeframe or timeframe
+    local_timeframe = config.market.local_timeframe or entry_timeframe
+    regime_timeframe = config.market.regime_timeframe or local_timeframe
+    local_all = candle_repo.all(symbol, local_timeframe) if config.strategy.scoring.use_nested_mtf else []
+    regime_all = candle_repo.all(symbol, regime_timeframe) if config.strategy.scoring.use_nested_mtf else []
     signals: list[Signal] = []
     trades: list[Trade] = []
     open_trades_at_end: list[Trade] = []
@@ -61,7 +78,16 @@ def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | 
             pending_signal = None
 
         if index > 0:
-            signal = evaluate(candles[: index + 1], config, symbol, timeframe, equity)
+            entry_slice = candles[: index + 1]
+            if config.strategy.scoring.use_nested_mtf:
+                as_of = entry_slice[-1].close_time if entry_slice[-1].close_time is not None else entry_slice[-1].open_time + _TIMEFRAME_MS[entry_timeframe]
+                window = max(config.market.warmup_candles, config.strategy.trend.ema_slow + config.strategy.pivots.right + config.strategy.triangle.max_candles)
+                local_closed = closed_candles_as_of(local_all, as_of, local_timeframe)
+                regime_closed = closed_candles_as_of(regime_all, as_of, regime_timeframe)
+                context = MarketContext(symbol, entry_timeframe, local_timeframe, regime_timeframe, entry_slice[-window:], local_closed[-window:], regime_closed[-window:])
+                signal = evaluate(context.entry_candles, config, symbol, entry_timeframe, equity, context)
+            else:
+                signal = evaluate(entry_slice, config, symbol, timeframe, equity)
             signals.append(signal)
             if signal_repo:
                 signal_repo.insert(signal)
@@ -92,6 +118,7 @@ def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | 
             "symbol": symbol,
             "timeframe": timeframe,
             "use_scoring_model": config.strategy.scoring.use_scoring_model,
+            "use_nested_mtf": config.strategy.scoring.use_nested_mtf,
             "min_trade_score": config.strategy.scoring.min_trade_score,
         },
     )
@@ -152,6 +179,7 @@ def _build_trade(signal: Signal, candle: Candle, slippage_percent: float, absolu
         triangle_max_wick_violation=_metadata_float(signal, "triangle_max_wick_violation"),
         triangle_max_close_violation=_metadata_float(signal, "triangle_max_close_violation"),
         triangle_line_tolerance_used=_metadata_float(signal, "triangle_line_tolerance_used"),
+        nested_metadata={key: value for key, value in signal.metadata.items() if key in {"nested_context", "parent_timeframe_alignment", "parent_4h_triangle_type", "parent_1h_triangle_type", "child_triangle_type", "regime_trend_direction", "local_trend_direction", "mtf_zone_context"}},
     ), None
 
 
@@ -205,6 +233,7 @@ def _maybe_close_trade(trade: Trade, candle: Candle, fee_percent: float, slippag
         trade.triangle_max_wick_violation,
         trade.triangle_max_close_violation,
         trade.triangle_line_tolerance_used,
+        trade.nested_metadata,
     )
 
 
@@ -244,6 +273,7 @@ def _mark_unrealized(trade: Trade, candle: Candle) -> Trade:
         trade.triangle_max_wick_violation,
         trade.triangle_max_close_violation,
         trade.triangle_line_tolerance_used,
+        trade.nested_metadata,
     )
 
 
