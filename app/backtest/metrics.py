@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from datetime import UTC, datetime
 from typing import Any
 
 from app.core.types import Signal, Trade
@@ -83,6 +84,9 @@ def calculate_metrics(
         "performance_by_nested_triangle_score_bucket": _quality_bucket_performance(closed, "score_nested_triangle"),
         "performance_by_entry_breakout_score_bucket": _quality_bucket_performance(closed, "score_entry_breakout"),
         "performance_by_mtf_zone_score_bucket": _quality_bucket_performance(closed, "score_mtf_zones"),
+        "performance_by_month": _period_performance(closed, "month"),
+        "performance_by_quarter": _period_performance(closed, "quarter"),
+        "performance_by_year": _period_performance(closed, "year"),
     }
     summary["legacy_candidate_funnel"] = _legacy_candidate_funnel(signals)
     summary["nested_candidate_funnel"] = _nested_candidate_funnel(signals)
@@ -233,3 +237,24 @@ def _counterfactual_performance(trades: list[Trade], key_func) -> dict[str, dict
             for timeframe in timeframes:
                 grouped[str(key_func(trade, str(timeframe)))].append(trade)
     return {key: _group_performance(items, lambda _: key)[key] for key, items in grouped.items()}
+
+
+def _period_performance(trades: list[Trade], period: str) -> dict[str, dict[str, float | int]]:
+    grouped: dict[str, list[Trade]] = defaultdict(list)
+    for trade in trades:
+        timestamp = trade.exit_time if trade.exit_time is not None else trade.entry_time
+        date = datetime.fromtimestamp(timestamp / 1000, UTC)
+        if period == "month":
+            key = date.strftime("%Y-%m")
+        elif period == "quarter":
+            key = f"{date.year}-Q{(date.month - 1) // 3 + 1}"
+        else:
+            key = str(date.year)
+        grouped[key].append(trade)
+    result: dict[str, dict[str, float | int]] = {}
+    for key, items in grouped.items():
+        result[key] = {
+            **_group_performance(items, lambda _: key)[key],
+            "max_losing_streak": _max_losing_streak(items),
+        }
+    return result

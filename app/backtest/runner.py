@@ -32,7 +32,7 @@ class BacktestResult:
     summary: dict
 
 
-def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | None, trade_repo: TradeRepository | None, config: AppConfig, symbol: str, timeframe: str, start_time: int | None = None, end_time: int | None = None) -> BacktestResult:
+def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | None, trade_repo: TradeRepository | None, config: AppConfig, symbol: str, timeframe: str, start_time: int | None = None, end_time: int | None = None, config_name: str | None = None, start_date: str | None = None, end_date: str | None = None) -> BacktestResult:
     candles = candle_repo.all(symbol, timeframe)
     candles = [candle for candle in candles if (start_time is None or candle.open_time >= start_time) and (end_time is None or candle.open_time < end_time)]
     entry_timeframe = config.market.entry_timeframe or timeframe
@@ -121,6 +121,9 @@ def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | 
             "use_scoring_model": config.strategy.scoring.use_scoring_model,
             "use_nested_mtf": config.strategy.scoring.use_nested_mtf,
             "min_trade_score": config.strategy.scoring.min_trade_score,
+            "config_name": config_name,
+            "start_date": start_date,
+            "end_date": end_date,
         },
     )
     write_report(run_id, summary, trades, open_trades_at_end, signals, equity_curve)

@@ -6,7 +6,17 @@ from pathlib import Path
 from typing import Any
 
 
-FIELDS = ("closed_trades", "accepted_signals", "win_rate", "expectancy_r", "profit_factor", "max_drawdown", "max_losing_streak", "rejected_by_mtf_zone", "would_be_blocked_trades", "would_be_blocked_expectancy_r", "would_be_blocked_profit_factor")
+FIELDS = ("symbol", "strategy_version", "config_name", "start_date", "end_date", "closed_trades", "accepted_signals", "win_rate", "expectancy_r", "profit_factor", "max_drawdown", "max_losing_streak", "rejected_by_mtf_zone", "would_be_blocked_trades", "would_be_blocked_expectancy_r", "would_be_blocked_profit_factor")
+
+LABELS = {
+    "strict-all-zones": "Strict all",
+    "hard-4h-1h": "Hard 4h + 1h",
+    "hard-4h": "Hard 4h only",
+    "hard-1h-15m": "Hard 1h + 15m",
+    "hard-1h": "Hard 1h only",
+    "hard-15m": "Hard 15m only",
+    "zone-penalty": "Penalty only",
+}
 
 
 def load_comparison(path: str | Path) -> dict[str, Any]:
@@ -15,8 +25,13 @@ def load_comparison(path: str | Path) -> dict[str, Any]:
     nested_funnel = summary.get("nested_candidate_funnel", {})
     counterfactual = summary.get("performance_by_would_be_strict_zone_blocked", {}).get("True", {})
     return {
-        "config": summary.get("strategy_version", "unknown"),
+        "config": _label(summary.get("config_name") or summary.get("strategy_version", "unknown")),
         "report_path": str(report_path),
+        "symbol": summary.get("symbol", "unknown"),
+        "strategy_version": summary.get("strategy_version", "unknown"),
+        "config_name": summary.get("config_name") or report_path.parent.name,
+        "start_date": summary.get("start_date") or "all",
+        "end_date": summary.get("end_date") or "all",
         "closed_trades": summary.get("closed_trades", summary.get("total_trades", 0)),
         "accepted_signals": summary.get("accepted_signals", 0),
         "win_rate": summary.get("win_rate", 0.0),
@@ -39,6 +54,11 @@ def format_comparison(paths: list[str | Path]) -> str:
     divider = "-|-".join("-" * widths[header] for header in headers)
     body = [" | ".join(str(row[header]).ljust(widths[header]) for header in headers) for row in rows]
     return "\n".join([line, divider, *body])
+
+
+def _label(value: str) -> str:
+    normalized = value.replace("_", "-")
+    return next((label for key, label in LABELS.items() if key in normalized), value)
 
 
 def main() -> None:

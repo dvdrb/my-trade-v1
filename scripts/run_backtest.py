@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, UTC
+from pathlib import Path
 
 from app.config.settings import load_config
 from app.data.db import DEFAULT_DB_PATH, connect, init_db
@@ -35,6 +36,9 @@ def main() -> None:
             timeframe,
             _date_to_ms(args.start),
             _date_to_ms(args.end),
+            Path(args.config).stem,
+            args.start,
+            args.end,
         )
     print(f"Backtest {result.run_id}: {result.summary}")
 

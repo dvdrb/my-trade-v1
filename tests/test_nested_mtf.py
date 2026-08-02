@@ -41,6 +41,17 @@ def test_strict_and_penalty_configs_toggle_mtf_zone_hard_filter() -> None:
     assert not _should_hard_reject_zone(metadata, strict)
 
 
+def test_missing_zone_ablation_configs_load_and_filter_only_configured_timeframes() -> None:
+    hard_15m = load_config("app/config/strategy_nested_mtf_hard_15m_penalty_4h_1h.yaml")
+    hard_1h_15m = load_config("app/config/strategy_nested_mtf_hard_1h_15m_penalty_4h.yaml")
+    assert hard_15m.strategy.scoring.mtf_zone_hard_filter_timeframes == ["15m"]
+    assert hard_1h_15m.strategy.scoring.mtf_zone_hard_filter_timeframes == ["1h", "15m"]
+    assert _should_hard_reject_zone({"would_be_blocked_timeframes": ["15m"]}, hard_15m)
+    assert not _should_hard_reject_zone({"would_be_blocked_timeframes": ["4h"]}, hard_15m)
+    assert _should_hard_reject_zone({"would_be_blocked_timeframes": ["1h"]}, hard_1h_15m)
+    assert not _should_hard_reject_zone({"would_be_blocked_timeframes": ["4h"]}, hard_1h_15m)
+
+
 def test_closed_candles_as_of_excludes_unfinished_parent_candles() -> None:
     hourly = [_candle(0, close_time=3_600_000), _candle(3_600_000, close_time=7_200_000)]
     four_hour = [_candle(0, close_time=14_400_000), _candle(14_400_000, close_time=28_800_000)]
@@ -140,3 +151,12 @@ def test_counterfactual_blocked_performance_is_populated() -> None:
     summary = calculate_metrics([trade], [], run_metadata={"use_nested_mtf": True})
     assert summary["performance_by_would_be_strict_zone_blocked"]["True"]["trades"] == 1
     assert summary["performance_by_would_be_blocked_timeframe"]["4h"]["trades"] == 1
+
+
+def test_period_performance_reports_are_populated() -> None:
+    timestamp = 1767225600000  # 2026-01-01 UTC
+    trade = Trade("BTC", "15m", Side.LONG, timestamp, 100, 1, 95, 110, timestamp, 110, 10, 2, "closed")
+    summary = calculate_metrics([trade], [])
+    assert summary["performance_by_month"]["2026-01"]["trades"] == 1
+    assert summary["performance_by_quarter"]["2026-Q1"]["max_losing_streak"] == 0
+    assert summary["performance_by_year"]["2026"]["profit_factor"] == 10
