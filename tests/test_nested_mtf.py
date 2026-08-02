@@ -34,9 +34,11 @@ def test_nested_mtf_config_loads() -> None:
 def test_strict_and_penalty_configs_toggle_mtf_zone_hard_filter() -> None:
     strict = load_config("app/config/strategy_nested_mtf_strict_zones.yaml")
     penalty = load_config("app/config/strategy_nested_mtf_zone_penalty.yaml")
-    metadata = {"mtf_opposite_zone_before_target": True}
+    metadata = {"mtf_opposite_zone_before_target": True, "would_be_blocked_timeframes": ["1h"]}
     assert _should_hard_reject_zone(metadata, strict)
     assert not _should_hard_reject_zone(metadata, penalty)
+    strict.strategy.scoring.mtf_zone_hard_filter_timeframes = ["4h"]
+    assert not _should_hard_reject_zone(metadata, strict)
 
 
 def test_closed_candles_as_of_excludes_unfinished_parent_candles() -> None:
@@ -131,3 +133,10 @@ def test_nested_score_components_are_exported_to_trade() -> None:
     assert trade.parent_timeframe_alignment == "both"
     summary = calculate_metrics([replace(trade, status="closed")], [], run_metadata={"use_nested_mtf": True})
     assert summary["performance_by_parent_4h_score_bucket"]["15_20"]["trades"] == 1
+
+
+def test_counterfactual_blocked_performance_is_populated() -> None:
+    trade = Trade("BTC", "15m", Side.LONG, 1, 100, 1, 95, 110, 2, 110, 10, 2, "closed", nested_metadata={"would_be_blocked_by_strict_mtf_zone": True, "would_be_blocked_timeframes": ["4h", "1h"], "child_triangle_type": "ascending"})
+    summary = calculate_metrics([trade], [], run_metadata={"use_nested_mtf": True})
+    assert summary["performance_by_would_be_strict_zone_blocked"]["True"]["trades"] == 1
+    assert summary["performance_by_would_be_blocked_timeframe"]["4h"]["trades"] == 1

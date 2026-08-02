@@ -62,6 +62,7 @@ class ScoringConfig(BaseModel):
     use_nested_mtf: bool = False
     nested_regime_tolerance_percent: float = 0.01
     mtf_zone_as_hard_filter: bool = False
+    mtf_zone_hard_filter_timeframes: list[str] | None = None
     min_trade_score: float = 50.0
     trend_as_hard_filter: bool = True
     zone_as_hard_filter: bool = True

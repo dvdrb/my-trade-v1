@@ -15,6 +15,7 @@ strategy:
     use_nested_mtf: true
     nested_regime_tolerance_percent: 0.01
     mtf_zone_as_hard_filter: false
+    mtf_zone_hard_filter_timeframes: []
     min_trade_score: 0
   pivots: {left: 4, right: 4}
   trend: {ema_fast: 50, ema_slow: 200, require_alignment: false}

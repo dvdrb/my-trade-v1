@@ -74,6 +74,10 @@ def calculate_metrics(
         "performance_by_4h_trend": _nested_group_performance(closed, "regime_trend_direction"),
         "performance_by_1h_trend": _nested_group_performance(closed, "local_trend_direction"),
         "performance_by_mtf_zone_context": _nested_group_performance(closed, "mtf_zone_context"),
+        "performance_by_would_be_strict_zone_blocked": _nested_group_performance(closed, "would_be_blocked_by_strict_mtf_zone"),
+        "performance_by_would_be_blocked_timeframe": _counterfactual_performance(closed, lambda trade, timeframe: timeframe),
+        "performance_by_would_be_blocked_timeframe_and_side": _counterfactual_performance(closed, lambda trade, timeframe: f"{timeframe}_{trade.side.value}"),
+        "performance_by_would_be_blocked_timeframe_and_child_triangle_type": _counterfactual_performance(closed, lambda trade, timeframe: f"{timeframe}_{trade.child_triangle_type or trade.nested_metadata.get('child_triangle_type', 'unknown')}"),
         "performance_by_parent_4h_score_bucket": _quality_bucket_performance(closed, "score_parent_4h_structure"),
         "performance_by_parent_1h_score_bucket": _quality_bucket_performance(closed, "score_parent_1h_structure"),
         "performance_by_nested_triangle_score_bucket": _quality_bucket_performance(closed, "score_nested_triangle"),
@@ -219,3 +223,13 @@ def _nested_group_performance(trades: list[Trade], key: str) -> dict[str, dict[s
         return getattr(trade, key, None) if getattr(trade, key, None) is not None else trade.nested_metadata.get(key)
 
     return _group_performance([trade for trade in trades if value(trade) is not None], lambda trade: str(value(trade)))
+
+
+def _counterfactual_performance(trades: list[Trade], key_func) -> dict[str, dict[str, float]]:
+    grouped: dict[str, list[Trade]] = defaultdict(list)
+    for trade in trades:
+        timeframes = trade.nested_metadata.get("would_be_blocked_timeframes", [])
+        if isinstance(timeframes, list):
+            for timeframe in timeframes:
+                grouped[str(key_func(trade, str(timeframe)))].append(trade)
+    return {key: _group_performance(items, lambda _: key)[key] for key, items in grouped.items()}

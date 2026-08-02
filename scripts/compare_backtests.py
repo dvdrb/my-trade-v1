@@ -6,13 +6,14 @@ from pathlib import Path
 from typing import Any
 
 
-FIELDS = ("closed_trades", "accepted_signals", "win_rate", "expectancy_r", "profit_factor", "max_drawdown", "max_losing_streak", "rejected_by_mtf_zone")
+FIELDS = ("closed_trades", "accepted_signals", "win_rate", "expectancy_r", "profit_factor", "max_drawdown", "max_losing_streak", "rejected_by_mtf_zone", "would_be_blocked_trades", "would_be_blocked_expectancy_r", "would_be_blocked_profit_factor")
 
 
 def load_comparison(path: str | Path) -> dict[str, Any]:
     report_path = Path(path)
     summary = json.loads(report_path.read_text(encoding="utf-8"))
     nested_funnel = summary.get("nested_candidate_funnel", {})
+    counterfactual = summary.get("performance_by_would_be_strict_zone_blocked", {}).get("True", {})
     return {
         "config": summary.get("strategy_version", "unknown"),
         "report_path": str(report_path),
@@ -24,6 +25,9 @@ def load_comparison(path: str | Path) -> dict[str, Any]:
         "max_drawdown": summary.get("max_drawdown", 0.0),
         "max_losing_streak": summary.get("max_losing_streak", 0),
         "rejected_by_mtf_zone": nested_funnel.get("rejected_by_mtf_zone", summary.get("rejected_by_mtf_zone", 0)),
+        "would_be_blocked_trades": counterfactual.get("trades", 0),
+        "would_be_blocked_expectancy_r": counterfactual.get("average_r", 0.0),
+        "would_be_blocked_profit_factor": counterfactual.get("profit_factor", 0.0),
     }
 
 

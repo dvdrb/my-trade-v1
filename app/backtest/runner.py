@@ -32,8 +32,9 @@ class BacktestResult:
     summary: dict
 
 
-def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | None, trade_repo: TradeRepository | None, config: AppConfig, symbol: str, timeframe: str) -> BacktestResult:
+def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | None, trade_repo: TradeRepository | None, config: AppConfig, symbol: str, timeframe: str, start_time: int | None = None, end_time: int | None = None) -> BacktestResult:
     candles = candle_repo.all(symbol, timeframe)
+    candles = [candle for candle in candles if (start_time is None or candle.open_time >= start_time) and (end_time is None or candle.open_time < end_time)]
     entry_timeframe = config.market.entry_timeframe or timeframe
     local_timeframe = config.market.local_timeframe or entry_timeframe
     regime_timeframe = config.market.regime_timeframe or local_timeframe
@@ -179,7 +180,7 @@ def _build_trade(signal: Signal, candle: Candle, slippage_percent: float, absolu
         triangle_max_wick_violation=_metadata_float(signal, "triangle_max_wick_violation"),
         triangle_max_close_violation=_metadata_float(signal, "triangle_max_close_violation"),
         triangle_line_tolerance_used=_metadata_float(signal, "triangle_line_tolerance_used"),
-        nested_metadata={key: value for key, value in signal.metadata.items() if key in {"nested_context", "parent_timeframe_alignment", "parent_4h_triangle_type", "parent_1h_triangle_type", "child_triangle_type", "regime_trend_direction", "local_trend_direction", "mtf_zone_context"}},
+        nested_metadata={key: value for key, value in signal.metadata.items() if key in {"nested_context", "parent_timeframe_alignment", "parent_4h_triangle_type", "parent_1h_triangle_type", "child_triangle_type", "regime_trend_direction", "local_trend_direction", "mtf_zone_context", "would_be_blocked_by_strict_mtf_zone", "would_be_blocked_timeframes", "would_be_blocked_zone_kinds", "would_be_blocked_min_distance_to_entry_r", "would_be_blocked_min_distance_to_target_r"}},
         score_parent_4h_structure=_metadata_float(signal, "score_parent_4h_structure"),
         score_parent_1h_structure=_metadata_float(signal, "score_parent_1h_structure"),
         score_nested_triangle=_metadata_float(signal, "score_nested_triangle"),

@@ -247,6 +247,23 @@ def test_15m_timeframe_passes_through_backtest_flow(tmp_path, monkeypatch) -> No
     assert result.summary["min_trade_score"] == 50.0
 
 
+def test_backtest_time_filters_restrict_entry_candles(tmp_path, monkeypatch) -> None:
+    db_path = tmp_path / "bot.sqlite3"
+    init_db(db_path)
+    seen: list[int] = []
+
+    def fake_evaluate(candles, config, symbol, timeframe, equity=None):
+        seen.append(candles[-1].open_time)
+        return Signal("BTC", timeframe, Decision.NO_SETUP, strategy_version="test")
+
+    monkeypatch.setattr("app.backtest.runner.evaluate", fake_evaluate)
+    with connect(db_path) as connection:
+        repo = CandleRepository(connection)
+        repo.insert_many([candle(1), candle(2), candle(3), candle(4)])
+        run_backtest(repo, None, None, AppConfig(), "BTC", "1h", start_time=2, end_time=4)
+    assert seen == [3]
+
+
 def test_scoring_candidate_funnel_invariants_and_bucket_sum() -> None:
     signals = [
         Signal("BTC", "15m", Decision.ACCEPTED, metadata={"triangle_candidates_found": 3, "breakout_candidates_found": 2, "scored_candidates": 2}),
