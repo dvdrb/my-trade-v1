@@ -1,0 +1,21 @@
+{
+  "best_config_by_symbol": {
+    "BTC": "strategy_nested_mtf_hard_1h_only"
+  },
+  "best_config_by_period": {
+    "smoke": "strategy_nested_mtf_hard_1h_only"
+  },
+  "overall_config_ranking": [
+    {
+      "config_name": "strategy_nested_mtf_hard_1h_only",
+      "periods": 1,
+      "closed_trades": 0,
+      "average_expectancy_r": 0.0,
+      "average_profit_factor": 0.0,
+      "max_drawdown": 0.0,
+      "insufficient_total_sample": true
+    }
+  ],
+  "configs_with_positive_expectancy_all_periods": [],
+  "configs_with_pf_above_1_2_all_periods": []
+}

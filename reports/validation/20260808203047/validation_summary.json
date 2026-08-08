@@ -1,0 +1,56 @@
+{
+  "best_config_by_symbol": {
+    "BTC": "strategy_nested_mtf_hard_1h_only"
+  },
+  "best_config_by_period": {
+    "full": "strategy_nested_mtf_hard_1h_only"
+  },
+  "overall_config_ranking": [
+    {
+      "config_name": "strategy_nested_mtf_hard_1h_only",
+      "periods": 1,
+      "closed_trades": 15,
+      "average_expectancy_r": 0.3706013144270533,
+      "average_profit_factor": 1.6982361619968502,
+      "max_drawdown": 0.002309472448413203,
+      "insufficient_total_sample": true
+    },
+    {
+      "config_name": "strategy_nested_mtf_hard_1h_15m_penalty_4h",
+      "periods": 1,
+      "closed_trades": 8,
+      "average_expectancy_r": 0.5829528564838306,
+      "average_profit_factor": 2.3875920094073293,
+      "max_drawdown": 0.002196346295110552,
+      "insufficient_total_sample": true
+    },
+    {
+      "config_name": "strategy_nested_mtf_strict_all_zones",
+      "periods": 1,
+      "closed_trades": 7,
+      "average_expectancy_r": 0.44090951986977106,
+      "average_profit_factor": 1.9171115592875372,
+      "max_drawdown": 0.002196346295110694,
+      "insufficient_total_sample": true
+    },
+    {
+      "config_name": "strategy_nested_mtf_zone_penalty",
+      "periods": 1,
+      "closed_trades": 41,
+      "average_expectancy_r": -0.023399944572828103,
+      "average_profit_factor": 0.9652730940744783,
+      "max_drawdown": 0.008818890993058062,
+      "insufficient_total_sample": true
+    }
+  ],
+  "configs_with_positive_expectancy_all_periods": [
+    "strategy_nested_mtf_hard_1h_only",
+    "strategy_nested_mtf_hard_1h_15m_penalty_4h",
+    "strategy_nested_mtf_strict_all_zones"
+  ],
+  "configs_with_pf_above_1_2_all_periods": [
+    "strategy_nested_mtf_hard_1h_only",
+    "strategy_nested_mtf_hard_1h_15m_penalty_4h",
+    "strategy_nested_mtf_strict_all_zones"
+  ]
+}

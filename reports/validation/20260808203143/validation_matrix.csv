@@ -1,0 +1,2 @@
+symbol,config_name,period_name,start_date,end_date,report_path,closed_trades,accepted_signals,expectancy_r,profit_factor,win_rate,max_drawdown,max_losing_streak,total_pnl,zone_rejects,sample_warning,skip_reason
+BTC,strategy_nested_mtf_hard_1h_only,full,,,reports/backtests/20260808203214/summary.json,15,82,0.3706013144270533,1.6982361619968502,0.5333333333333333,0.002309472448413203,2,5.5581664616029,1049,True,
