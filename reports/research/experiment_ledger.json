@@ -73,5 +73,16 @@
     "reason": "All 785 closed trades and all metrics were exactly unchanged. With every risk tier at score 0, the component did not alter a trade decision or selected candidate, so the experimental hook was reverted.",
     "strategy_change": false,
     "report_path": "reports/validation/20260814103429"
+  },
+  {
+    "experiment_id": "R007",
+    "timestamp": "2026-08-14T11:03:00Z",
+    "kind": "parent_child_geometry",
+    "baseline_commit": "88fc508",
+    "hypothesis": "Requiring at least 90% child containment in the parent improves nested-triangle robustness.",
+    "decision": "REJECT",
+    "reason": "Train improved modestly but validation expectancy is negative on BTC, ETH, and SOL and every validation PF is below 1. The containment threshold was reverted.",
+    "strategy_change": false,
+    "report_path": "reports/validation/20260814105020"
   }
 ]
