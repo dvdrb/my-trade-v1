@@ -18,5 +18,16 @@
     "decision": "REJECT",
     "reason": "BTC train expectancy was -0.259R (PF 0.681) over 78 trades. Positive validation (+0.170R) has only 22 trades and does not offset the train collapse.",
     "strategy_change": false
+  },
+  {
+    "experiment_id": "R002",
+    "timestamp": "2026-08-14T08:46:00Z",
+    "kind": "baseline_control",
+    "baseline_commit": "ae11bba",
+    "hypothesis": "Hard 1h opposite-zone blocking plus a 4h zone penalty is robust across BTC, ETH, and SOL.",
+    "decision": "REJECT",
+    "reason": "Across BTC, ETH, and SOL the train aggregate is -0.144R expectancy with PF 0.806 over 100 trades. ETH and SOL are negative in both train and validation, while all validation-symbol samples are below 20 trades.",
+    "strategy_change": false,
+    "report_path": "reports/validation/20260814083209"
   }
 ]

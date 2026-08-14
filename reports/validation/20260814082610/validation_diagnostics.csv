@@ -1,0 +1,52 @@
+symbol,config_name,period_name,diagnostic_group,diagnostic_key,closed_trades,win_rate,expectancy_r,profit_factor,total_pnl,max_losing_streak
+BTC,strategy_nested_mtf_hard_1h_only,train,side,short,43,0.3023255813953488,-0.3231932527567569,0.6152278355082089,-13.835390362469086,6
+BTC,strategy_nested_mtf_hard_1h_only,train,side,long,35,0.34285714285714286,-0.17954491964891753,0.7681378256911062,-6.216872590493912,8
+BTC,strategy_nested_mtf_hard_1h_only,train,parent_timeframe_alignment,1h_only,58,0.3275862068965517,-0.22615536991083013,0.7168999306831383,-12.979545056567549,9
+BTC,strategy_nested_mtf_hard_1h_only,train,parent_timeframe_alignment,both,10,0.3,-0.3777163943296561,0.5413130600473094,-3.804244590081566,4
+BTC,strategy_nested_mtf_hard_1h_only,train,parent_timeframe_alignment,4h_only,10,0.3,-0.32872066581279535,0.621199189535614,-3.268473306313884,5
+BTC,strategy_nested_mtf_hard_1h_only,train,child_triangle_type,descending,23,0.391304347826087,-0.012253554995366612,0.985651784372048,-0.231898298756956,6
+BTC,strategy_nested_mtf_hard_1h_only,train,child_triangle_type,ascending,41,0.3170731707317073,-0.2780457062966756,0.6616934837868352,-11.283453133460222,12
+BTC,strategy_nested_mtf_hard_1h_only,train,child_triangle_type,symmetrical,14,0.21428571428571427,-0.6071197380853949,0.35595899905134404,-8.536911520745825,9
+BTC,strategy_nested_mtf_hard_1h_only,train,4h_trend,neutral,12,0.5,0.27407442966062817,1.4673688419722706,3.2893225871619194,2
+BTC,strategy_nested_mtf_hard_1h_only,train,4h_trend,bullish,26,0.38461538461538464,-0.052620418257933746,0.9231361555097805,-1.4064373851670373,3
+BTC,strategy_nested_mtf_hard_1h_only,train,4h_trend,bearish,40,0.225,-0.552553608436848,0.4140379360260372,-21.93514815495788,9
+BTC,strategy_nested_mtf_hard_1h_only,train,1h_trend,neutral,9,0.4444444444444444,-0.0413874691978516,0.9589255562791332,-0.2866263838994978,4
+BTC,strategy_nested_mtf_hard_1h_only,train,1h_trend,bearish,35,0.2571428571428571,-0.4215787745550817,0.5175168447829793,-14.669436474298456,10
+BTC,strategy_nested_mtf_hard_1h_only,train,1h_trend,bullish,34,0.35294117647058826,-0.14863640364835695,0.7992665406569864,-5.096200094765043,5
+BTC,strategy_nested_mtf_hard_1h_only,train,mtf_zone_context,15m favorable zone; 15m opposite zone before target,3,0.6666666666666666,0.7339338199735058,2.7330570646876966,2.216145984845586,1
+BTC,strategy_nested_mtf_hard_1h_only,train,mtf_zone_context,1h favorable zone; 15m favorable zone; 15m opposite zone before target,8,0.5,0.2887276737678445,1.5123267830116316,2.3320472452592123,2
+BTC,strategy_nested_mtf_hard_1h_only,train,mtf_zone_context,1h favorable zone; 15m favorable zone,2,1.0,1.845538196478532,3.696743558470727,3.696743558470727,0
+BTC,strategy_nested_mtf_hard_1h_only,train,mtf_zone_context,4h favorable zone; 1h favorable zone; 15m favorable zone,20,0.35,-0.18653900862301195,0.7628885188216781,-3.6353614019177445,7
+BTC,strategy_nested_mtf_hard_1h_only,train,mtf_zone_context,4h favorable zone; 4h opposite zone before target; 1h favorable zone; 15m favorable zone; 15m opposite zone before target,10,0.0,-1.1681000481186488,0.0,-11.707986518996586,10
+BTC,strategy_nested_mtf_hard_1h_only,train,mtf_zone_context,4h favorable zone; 4h opposite zone before target; 1h favorable zone; 15m favorable zone,11,0.45454545454545453,0.16213398609482785,1.2554343904354646,1.7827939118225788,2
+BTC,strategy_nested_mtf_hard_1h_only,train,mtf_zone_context,4h favorable zone; 1h favorable zone; 15m favorable zone; 15m opposite zone before target,22,0.22727272727272727,-0.5643466520271434,0.39751042461450403,-12.40348730326281,12
+BTC,strategy_nested_mtf_hard_1h_only,train,mtf_zone_context,15m favorable zone,2,0.0,-1.1700740740361117,0.0,-2.3331584291839595,2
+BTC,strategy_nested_mtf_hard_1h_only,train,score_bucket,80_100,8,0.375,-0.2093518085870813,0.726664231538411,-1.6887417696730918,4
+BTC,strategy_nested_mtf_hard_1h_only,train,score_bucket,70_79,38,0.3157894736842105,-0.2514729436706262,0.6870906638570208,-9.471310438187482,8
+BTC,strategy_nested_mtf_hard_1h_only,train,score_bucket,60_69,12,0.3333333333333333,-0.22839421563285298,0.7161645900917182,-2.7347610784269585,3
+BTC,strategy_nested_mtf_hard_1h_only,train,score_bucket,50_59,16,0.3125,-0.2665827038148105,0.6771039494214293,-4.214705962364715,5
+BTC,strategy_nested_mtf_hard_1h_only,train,score_bucket,40_49,4,0.25,-0.4861354698602523,0.4656166536197673,-1.9427437043107494,2
+BTC,strategy_nested_mtf_hard_1h_only,train,score_bucket,0_39,0,0.0,0.0,0.0,0.0,0
+BTC,strategy_nested_mtf_hard_1h_only,validation,side,long,12,0.3333333333333333,-0.21690721482064634,0.7215331165743273,-2.6367582574044857,4
+BTC,strategy_nested_mtf_hard_1h_only,validation,side,short,10,0.6,0.6341131878912019,2.402395814680485,6.358199772650377,4
+BTC,strategy_nested_mtf_hard_1h_only,validation,parent_timeframe_alignment,1h_only,21,0.42857142857142855,0.09609986349267424,1.1418152512991142,1.9857896385438634,9
+BTC,strategy_nested_mtf_hard_1h_only,validation,parent_timeframe_alignment,4h_only,1,1.0,1.7201481677181025,1.7356518767020266,1.7356518767020266,0
+BTC,strategy_nested_mtf_hard_1h_only,validation,child_triangle_type,symmetrical,7,0.7142857142857143,0.8881731498370452,3.510515413396456,6.269903147713073,2
+BTC,strategy_nested_mtf_hard_1h_only,validation,child_triangle_type,descending,7,0.5714285714285714,0.5342816670998115,2.0403008701854857,3.739941404898831,3
+BTC,strategy_nested_mtf_hard_1h_only,validation,child_triangle_type,ascending,8,0.125,-0.7773673021867169,0.20501982472971209,-6.288403037366012,7
+BTC,strategy_nested_mtf_hard_1h_only,validation,4h_trend,neutral,3,0.6666666666666666,0.6995735874383687,2.8403057775191547,2.1033107987701403,1
+BTC,strategy_nested_mtf_hard_1h_only,validation,4h_trend,bullish,8,0.125,-0.8256648457663729,0.20626860997017452,-6.65286682523974,6
+BTC,strategy_nested_mtf_hard_1h_only,validation,4h_trend,bearish,11,0.6363636363636364,0.749531209534558,2.8470386952863604,8.270997541715492,3
+BTC,strategy_nested_mtf_hard_1h_only,validation,1h_trend,bullish,9,0.3333333333333333,-0.21502390841852978,0.7168548306604104,-1.9650852336447624,5
+BTC,strategy_nested_mtf_hard_1h_only,validation,1h_trend,neutral,2,0.0,-1.2856914140245543,0.0,-2.5844707928248383,2
+BTC,strategy_nested_mtf_hard_1h_only,validation,1h_trend,bearish,11,0.6363636363636364,0.749531209534558,2.8470386952863604,8.270997541715492,3
+BTC,strategy_nested_mtf_hard_1h_only,validation,mtf_zone_context,4h favorable zone; 1h favorable zone; 15m favorable zone,8,0.5,0.3233706492830284,1.5817673523951004,2.578523875336555,3
+BTC,strategy_nested_mtf_hard_1h_only,validation,mtf_zone_context,4h favorable zone; 1h favorable zone; 15m favorable zone; 15m opposite zone before target,11,0.45454545454545453,0.14905257918585682,1.2274334315720612,1.6410155697585622,3
+BTC,strategy_nested_mtf_hard_1h_only,validation,mtf_zone_context,15m favorable zone; 15m opposite zone before target,1,1.0,1.8389266887336548,1.856962603061339,1.856962603061339,0
+BTC,strategy_nested_mtf_hard_1h_only,validation,mtf_zone_context,1h favorable zone; 15m favorable zone; 15m opposite zone before target,2,0.0,-1.163612476489023,0.0,-2.355060532910566,2
+BTC,strategy_nested_mtf_hard_1h_only,validation,score_bucket,80_100,1,1.0,1.7201481677181025,1.7356518767020266,1.7356518767020266,0
+BTC,strategy_nested_mtf_hard_1h_only,validation,score_bucket,70_79,16,0.5,0.3061503179876915,1.5299279408832709,4.894783267307432,6
+BTC,strategy_nested_mtf_hard_1h_only,validation,score_bucket,60_69,0,0.0,0.0,0.0,0.0,0
+BTC,strategy_nested_mtf_hard_1h_only,validation,score_bucket,50_59,4,0.25,-0.41991715796122997,0.5228948544249252,-1.6943490752752335,3
+BTC,strategy_nested_mtf_hard_1h_only,validation,score_bucket,40_49,1,0.0,-1.200639322611983,0.0,-1.2146445534883346,1
+BTC,strategy_nested_mtf_hard_1h_only,validation,score_bucket,0_39,0,0.0,0.0,0.0,0.0,0

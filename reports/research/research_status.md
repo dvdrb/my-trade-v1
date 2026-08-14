@@ -2,8 +2,8 @@
 
 ## Classification
 
-**NEEDS MORE RESEARCH — blocked by data quality.** No strategy candidate has
-been selected, and no final holdout has been run.
+**NEEDS MORE RESEARCH — baseline controls in progress.** No strategy candidate
+has been selected, and no final holdout has been run.
 
 ## What was verified
 
@@ -14,23 +14,22 @@ been selected, and no final holdout has been run.
 - Fees, slippage, actual-entry risk/reward revalidation, and conservative
   stop-first treatment of ambiguous stop/target candles are covered by tests.
 
-## Data gate
+## Research-data gate
 
-The planned protocol requires a continuous common BTC/ETH/SOL history of at
-least 20,000 15m candles, 5,000 1h candles, and 2,000 4h candles per symbol.
-The available database fails the 15m requirement for every symbol. BTC also
-has one internal 1h gap. The current Hyperliquid public candle endpoint
-returned zero BTC 15m candles for an explicit historical request ending before
-the retained range. This matches the official API documentation:
-`candleSnapshot` provides only the most recent 5,000 candles. Pagination
-therefore cannot recover the missing period.
+The independent Binance USD-M research store now has 56,673 continuous 15m
+candles per BTC, ETH, and SOL from 2025-01-01 through 2026-08-14 08:00 UTC,
+with 14,168 locally derived 1h candles and 3,542 derived 4h candles per
+symbol. The provider-aware audit passed after archive checksum, canonical hash,
+OHLC, continuity, common-grid, and derivation checks. The execution-venue
+Hyperliquid history remains separate and is used only for compatibility
+diagnostics.
 
-Existing validation reports are therefore exploratory only; they must not be
-used to select a strategy or to establish a train/validation/holdout split.
+The chronological split is frozen: train through 2025-12-21, validation from
+2025-12-22 through 2026-04-18, and final holdout from 2026-04-19 onward.
+Only train and validation are currently being used for selection.
 
 ## Required next step
 
-Import a verified, continuous historical source for BTC, ETH, and SOL at 15m,
-1h, and 4h. Then run `python scripts/audit_research_data.py`; it exits
-nonzero until the dataset meets the research gate. Only after it passes should
-the chronological split boundaries be frozen and controlled experiments begin.
+Complete the remaining baseline controls, record every result in the immutable
+experiment ledger, and test only bounded hypotheses that survive the controls.
+The final holdout remains locked until a candidate passes validation gates.

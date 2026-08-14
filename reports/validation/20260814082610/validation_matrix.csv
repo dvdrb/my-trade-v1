@@ -1,0 +1,3 @@
+symbol,config_name,period_name,start_date,end_date,report_path,closed_trades,accepted_signals,expectancy_r,profit_factor,win_rate,max_drawdown,max_losing_streak,total_pnl,zone_rejects,sample_warning,skip_reason
+BTC,strategy_nested_mtf_hard_1h_only,train,2025-01-01,2025-12-22,reports/backtests/20260814082809/summary.json,78,273,-0.25873566738785464,0.6805446127816884,0.32051282051282054,0.02774695269984531,9,-20.05226295296299,5569,False,
+BTC,strategy_nested_mtf_hard_1h_only,validation,2025-12-22,2026-04-19,reports/backtests/20260814083107/summary.json,22,102,0.16992024095746636,1.2657669037222619,0.45454545454545453,0.008451150014337284,6,3.7214415152458926,1653,False,
