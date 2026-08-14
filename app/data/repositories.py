@@ -35,6 +35,14 @@ class CandleRepository:
             self.insert(candle)
         self.connection.commit()
 
+    def replace_timeframe(self, symbol: str, timeframe: str, candles: list[Candle]) -> None:
+        if any(candle.symbol != symbol or candle.timeframe != timeframe for candle in candles):
+            raise ValueError("replacement candles must match the requested symbol and timeframe")
+        self.connection.execute("DELETE FROM candles WHERE symbol = ? AND timeframe = ?", (symbol, timeframe))
+        for candle in candles:
+            self.insert(candle)
+        self.connection.commit()
+
     def latest(self, symbol: str, timeframe: str, limit: int) -> list[Candle]:
         rows = self.connection.execute(
             """

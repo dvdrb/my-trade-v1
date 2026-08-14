@@ -37,6 +37,28 @@ def _iso(timestamp: int) -> str:
     return datetime.fromtimestamp(timestamp / 1000, UTC).isoformat().replace("+00:00", "Z")
 
 
+def common_history(repo: CandleRepository, symbols: list[str]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for timeframe, minimum in REQUIREMENTS.items():
+        by_symbol = {symbol: repo.all(symbol, timeframe) for symbol in symbols}
+        if any(not candles for candles in by_symbol.values()):
+            result[timeframe] = {"common_candles": 0, "minimum_required": minimum, "common_gaps": 0, "meets_minimum": False}
+            continue
+        start = max(candles[0].open_time for candles in by_symbol.values())
+        end = min(candles[-1].open_time for candles in by_symbol.values())
+        common_open_times = set.intersection(*(set(candle.open_time for candle in candles if start <= candle.open_time <= end) for candles in by_symbol.values()))
+        expected = (end - start) // INTERVAL_MS[timeframe] + 1
+        result[timeframe] = {
+            "first": _iso(start),
+            "last": _iso(end),
+            "common_candles": len(common_open_times),
+            "minimum_required": minimum,
+            "common_gaps": expected - len(common_open_times),
+            "meets_minimum": len(common_open_times) >= minimum and expected == len(common_open_times),
+        }
+    return result
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fail-closed data-quality audit for nested-MTF research.")
     parser.add_argument("--symbols", nargs="+", default=["BTC", "ETH", "SOL"])
@@ -47,12 +69,15 @@ def main() -> None:
     with connect(args.db) as connection:
         repo = CandleRepository(connection)
         result = {symbol: audit_symbol(repo, symbol) for symbol in args.symbols}
-    result["research_ready"] = all(
+        result["common_history"] = common_history(repo, args.symbols)
+    individual_ready = all(
         bool(values[timeframe]["meets_minimum"]) and int(values[timeframe]["internal_gaps"]) == 0
         for symbol, values in result.items()
-        if symbol != "research_ready"
+        if symbol not in {"research_ready", "common_history"}
         for timeframe in REQUIREMENTS
     )
+    common_ready = all(bool(values["meets_minimum"]) for values in result["common_history"].values())
+    result["research_ready"] = individual_ready and common_ready
     rendered = json.dumps(result, indent=2)
     print(rendered)
     if args.output:

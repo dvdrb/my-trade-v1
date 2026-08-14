@@ -91,6 +91,31 @@ Duplicate candles are ignored using the unique key:
 symbol, timeframe, open_time
 ```
 
+## Verified Historical Research Import
+
+The public Hyperliquid candle endpoint retains only 5,000 recent candles, so
+it cannot provide the research dataset by itself. Use a verified canonical
+15-minute CSV containing the exact same continuous UTC grid for `BTC`, `ETH`,
+and `SOL`. Required columns are:
+
+```text
+symbol,open_time,close_time,open,high,low,close,volume
+```
+
+Timestamps are Unix milliseconds. Verify the file's trusted digest, then run:
+
+```bash
+shasum -a 256 /path/to/hyperliquid_15m.csv
+python scripts/import_hyperliquid_history.py /path/to/hyperliquid_15m.csv \
+  --sha256 <trusted-sha256>
+python scripts/audit_research_data.py
+```
+
+The importer refuses data with gaps, duplicates, invalid OHLC values, unequal
+symbol grids, insufficient history, or fewer than 20 matching candles against
+the official Hyperliquid 15m API. It derives 1h and 4h candles locally from
+complete 15m buckets and replaces only those imported symbol/timeframe rows.
+
 ## Fetch Hyperliquid Candles
 
 Fetch read-only candle data from Hyperliquid and save it locally:
