@@ -27,6 +27,18 @@ def canonical_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def merge_verified(target: dict[int, object], candles) -> None:
+    timestamps = [candle.open_time for candle in candles]
+    if timestamps != sorted(timestamps):
+        raise ValueError("Binance archive rows are out of order")
+    if len(timestamps) != len(set(timestamps)):
+        raise ValueError("Binance archive contains duplicate timestamps")
+    for candle in candles:
+        if candle.open_time in target:
+            raise ValueError(f"duplicate timestamp across Binance sources: {candle.open_time}")
+        target[candle.open_time] = candle
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Acquire checksum-verified Binance USD-M research candles.")
     parser.add_argument("--provider", required=True, choices=["binance-usdm"])
@@ -51,11 +63,9 @@ def main() -> None:
         for month in archive_months:
             record = download_archive(remote, args.timeframe, month, args.raw_root)
             records.append(record.__dict__)
-            for candle in parse_archive(Path(record.path), local):
-                by_symbol[local][candle.open_time] = candle
+            merge_verified(by_symbol[local], parse_archive(Path(record.path), local))
         current_start = int(datetime(end.year, end.month, 1, tzinfo=UTC).timestamp() * 1000)
-        for candle in fetch_klines(remote, current_start, int(end.timestamp() * 1000)):
-            by_symbol[local][candle.open_time] = candle
+        merge_verified(by_symbol[local], [candle for candle in fetch_klines(remote, current_start, int(end.timestamp() * 1000)) if candle.close_time <= int(end.timestamp() * 1000)])
 
     first = max(min(values) for values in by_symbol.values())
     last = min(max(values) for values in by_symbol.values())
@@ -70,9 +80,10 @@ def main() -> None:
             chunk = missing[offset:offset + 1_500]
             if not chunk:
                 continue
-            for candle in fetch_klines(remote, chunk[0], chunk[-1] + step):
-                if candle.open_time in set(chunk):
-                    values[candle.open_time] = candle
+            repairs = [candle for candle in fetch_klines(remote, chunk[0], chunk[-1] + step) if candle.open_time in set(chunk)]
+            if len(repairs) != len(chunk):
+                raise SystemExit(f"Binance REST could not repair every missing candle for {local}")
+            merge_verified(values, repairs)
     common = [[by_symbol[symbol][timestamp] for timestamp in expected] for symbol in args.symbols]
     canonical = [candle for candles in common for candle in candles]
     integrity = validate_candles(canonical, "15m")

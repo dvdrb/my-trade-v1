@@ -7,6 +7,7 @@ import zipfile
 import pytest
 
 from app.data.binance_usdm import SYMBOL_MAP, parse_archive, verify_checksum
+from scripts.fetch_research_data import merge_verified
 
 
 def test_checksum_verification_accepts_matching_digest_and_rejects_mismatch() -> None:
@@ -26,3 +27,16 @@ def test_binance_kline_archive_parsing_supports_header_and_symbol_mapping(tmp_pa
     assert candles[0].symbol == "BTC"
     assert candles[0].close_time == 900_000
     assert candles[0].volume == 4
+
+
+def test_merge_rejects_duplicate_or_out_of_order_archive_rows() -> None:
+    from app.core.types import Candle
+
+    first = Candle("BTC", "15m", 0, 1, 2, 0.5, 1.5, 1, 900_000)
+    second = Candle("BTC", "15m", 900_000, 1, 2, 0.5, 1.5, 1, 1_800_000)
+    target = {}
+    merge_verified(target, [first, second])
+    with pytest.raises(ValueError, match="duplicate"):
+        merge_verified(target, [first])
+    with pytest.raises(ValueError, match="out of order"):
+        merge_verified({}, [second, first])
