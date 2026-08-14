@@ -62,5 +62,16 @@
     "reason": "The 571-trade train dataset shows only weak, market-specific effects. Parent 1h score is weakly negative across BTC/ETH/SOL, while convergence and room-to-move do not agree across symbols. No strategy rule was changed.",
     "strategy_change": false,
     "report_path": "reports/research/structural_diagnostics.json"
+  },
+  {
+    "experiment_id": "R006",
+    "timestamp": "2026-08-14T10:48:00Z",
+    "kind": "score_calibration",
+    "baseline_commit": "f581534",
+    "hypothesis": "Removing the weakly negative 1h-parent score changes selected nested setups and improves validation.",
+    "decision": "REJECT",
+    "reason": "All 785 closed trades and all metrics were exactly unchanged. With every risk tier at score 0, the component did not alter a trade decision or selected candidate, so the experimental hook was reverted.",
+    "strategy_change": false,
+    "report_path": "reports/validation/20260814103429"
   }
 ]
