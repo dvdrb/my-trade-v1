@@ -95,5 +95,16 @@
     "reason": "Validation is positive across BTC, ETH, and SOL (194 trades, +0.029R, PF 1.042), but it misses the qualification gates and train remains negative. The experiment is not retained or stacked.",
     "strategy_change": false,
     "report_path": "reports/validation/20260814110523"
+  },
+  {
+    "experiment_id": "R009",
+    "timestamp": "2026-08-14T11:33:00Z",
+    "kind": "parent_child_geometry",
+    "baseline_commit": "79ad472",
+    "hypothesis": "Excluding child setups with both 1h and 4h parents improves nested-triangle robustness.",
+    "decision": "REJECT",
+    "reason": "BTC and SOL validation improved, but ETH remains negative in both periods and aggregate PF is below 1. The alignment filter was reverted.",
+    "strategy_change": false,
+    "report_path": "reports/validation/20260814112009"
   }
 ]
