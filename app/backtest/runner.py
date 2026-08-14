@@ -43,6 +43,7 @@ def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | 
     regime_all = candle_repo.all(symbol, regime_timeframe) if config.strategy.scoring.use_nested_mtf else []
     local_close_times = [(candle.close_time if candle.close_time is not None else candle.open_time + _TIMEFRAME_MS[local_timeframe]) for candle in local_all]
     regime_close_times = [(candle.close_time if candle.close_time is not None else candle.open_time + _TIMEFRAME_MS[regime_timeframe]) for candle in regime_all]
+    context_window = max(config.market.warmup_candles, config.strategy.trend.ema_slow + config.strategy.pivots.right + config.strategy.triangle.max_candles)
     signals: list[Signal] = []
     trades: list[Trade] = []
     open_trades_at_end: list[Trade] = []
@@ -83,13 +84,12 @@ def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | 
             pending_signal = None
 
         if index > 0:
-            entry_slice = candles[: index + 1]
+            entry_slice = candles[max(0, index - context_window + 1): index + 1] if config.strategy.scoring.use_nested_mtf else candles[: index + 1]
             if config.strategy.scoring.use_nested_mtf:
                 as_of = entry_slice[-1].close_time if entry_slice[-1].close_time is not None else entry_slice[-1].open_time + _TIMEFRAME_MS[entry_timeframe]
-                window = max(config.market.warmup_candles, config.strategy.trend.ema_slow + config.strategy.pivots.right + config.strategy.triangle.max_candles)
                 local_end = bisect_right(local_close_times, as_of)
                 regime_end = bisect_right(regime_close_times, as_of)
-                context = MarketContext(symbol, entry_timeframe, local_timeframe, regime_timeframe, entry_slice[-window:], local_all[max(0, local_end - window):local_end], regime_all[max(0, regime_end - window):regime_end])
+                context = MarketContext(symbol, entry_timeframe, local_timeframe, regime_timeframe, entry_slice, local_all[max(0, local_end - context_window):local_end], regime_all[max(0, regime_end - context_window):regime_end])
                 signal = evaluate(context.entry_candles, config, symbol, entry_timeframe, equity, context)
             else:
                 signal = evaluate(entry_slice, config, symbol, timeframe, equity)

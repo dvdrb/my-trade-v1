@@ -8,5 +8,15 @@
     "decision": "BLOCKED",
     "reason": "The public endpoint returned no BTC 15m candles for a window ending 2026-05-18T15:45:00Z. Existing BTC/ETH/SOL 15m histories are below the 20,000-candle requirement.",
     "strategy_change": false
+  },
+  {
+    "experiment_id": "R001",
+    "timestamp": "2026-08-14T08:31:00Z",
+    "kind": "baseline_control",
+    "baseline_commit": "75e76b0",
+    "hypothesis": "Hard 1h opposite-zone filtering improves the nested setup over the full Binance research history.",
+    "decision": "REJECT",
+    "reason": "BTC train expectancy was -0.259R (PF 0.681) over 78 trades. Positive validation (+0.170R) has only 22 trades and does not offset the train collapse.",
+    "strategy_change": false
   }
 ]
