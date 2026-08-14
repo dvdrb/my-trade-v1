@@ -129,6 +129,7 @@ def _group_performance(trades: list[Trade], key_func) -> dict[str, dict[str, flo
             "average_r": sum(item.r_multiple for item in items) / len(items),
             "total_pnl": sum(item.pnl for item in items),
             "profit_factor": _profit_factor(items),
+            "max_losing_streak": _max_losing_streak(items),
         }
         for key, items in grouped.items()
     }
@@ -136,7 +137,7 @@ def _group_performance(trades: list[Trade], key_func) -> dict[str, dict[str, flo
 
 def _triangle_performance(trades: list[Trade]) -> dict[str, dict[str, float]]:
     result = {
-        kind: {"trades": 0, "win_rate": 0.0, "average_r": 0.0, "total_pnl": 0.0, "profit_factor": 0.0}
+        kind: {"trades": 0, "win_rate": 0.0, "average_r": 0.0, "total_pnl": 0.0, "profit_factor": 0.0, "max_losing_streak": 0}
         for kind in ("ascending", "descending", "symmetrical")
     }
     result.update(_group_performance([trade for trade in trades if trade.triangle_type], lambda trade: trade.triangle_type or "unknown"))
@@ -164,7 +165,7 @@ def _quality_bucket_performance(trades: list[Trade], field_name: str) -> dict[st
 
 
 def _bucket_performance(trades: list[Trade], value_func, buckets: list[tuple[float, float, str]]) -> dict[str, dict[str, float]]:
-    result = {label: {"trades": 0, "win_rate": 0.0, "average_r": 0.0, "total_pnl": 0.0, "profit_factor": 0.0} for _, _, label in buckets}
+    result = {label: {"trades": 0, "win_rate": 0.0, "average_r": 0.0, "total_pnl": 0.0, "profit_factor": 0.0, "max_losing_streak": 0} for _, _, label in buckets}
     grouped: dict[str, list[Trade]] = defaultdict(list)
     for trade in trades:
         value = value_func(trade)
@@ -181,6 +182,7 @@ def _bucket_performance(trades: list[Trade], value_func, buckets: list[tuple[flo
             "average_r": sum(item.r_multiple for item in items) / len(items),
             "total_pnl": sum(item.pnl for item in items),
             "profit_factor": _profit_factor(items),
+            "max_losing_streak": _max_losing_streak(items),
         }
     return result
 
