@@ -2,8 +2,8 @@
 
 ## Classification
 
-**NO ROBUST CANDIDATE.** The completed baseline controls are rejected; no final
-holdout has been run.
+**NO ROBUST STRUCTURAL EDGE FOUND YET.** The completed diagnostic-led research
+cycle produced no qualifying candidate; no final holdout has been run.
 
 ## What was verified
 
@@ -30,11 +30,10 @@ Only train and validation are currently being used for selection.
 
 ## Required next step
 
-All currently defined zone-filter controls have been evaluated and recorded in
-the immutable ledger. The penalty-only baseline is negative across the locked
-periods (785 trades, -0.081R aggregate expectancy, PF 0.888), and the hard
-filters sacrifice sample size without producing cross-symbol robustness.
+The diagnostic-led structural cycle is recorded in `final_research_report.md`.
+The penalty-only baseline is negative across the locked periods, and five
+independent structural tests did not produce a qualifying cross-symbol edge.
 
-The final holdout remains locked. A future research cycle must begin with a new
-predeclared hypothesis and preserve the same data, period, and sample gates;
-it must not tune to these validation outcomes.
+The final holdout remains locked. A future cycle must begin with independently
+observable parent-structure or regime information rather than further threshold
+tuning of the features rejected in this cycle.
