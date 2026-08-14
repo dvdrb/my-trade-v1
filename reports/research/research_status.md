@@ -21,7 +21,9 @@ least 20,000 15m candles, 5,000 1h candles, and 2,000 4h candles per symbol.
 The available database fails the 15m requirement for every symbol. BTC also
 has one internal 1h gap. The current Hyperliquid public candle endpoint
 returned zero BTC 15m candles for an explicit historical request ending before
-the retained range, so pagination cannot recover the missing period.
+the retained range. This matches the official API documentation:
+`candleSnapshot` provides only the most recent 5,000 candles. Pagination
+therefore cannot recover the missing period.
 
 Existing validation reports are therefore exploratory only; they must not be
 used to select a strategy or to establish a train/validation/holdout split.

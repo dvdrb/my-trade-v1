@@ -16,6 +16,7 @@ INTERVAL_MS = {
     "4h": 14_400_000,
     "1d": 86_400_000,
 }
+MAX_CANDLE_SNAPSHOT = 5_000
 
 
 def normalize_candle(raw: dict, symbol: str, timeframe: str) -> Candle:
@@ -35,34 +36,23 @@ def normalize_candle(raw: dict, symbol: str, timeframe: str) -> Candle:
     )
 
 
-def fetch_candles(symbol: str, timeframe: str, limit: int, end_time: int | None = None, batch_limit: int = 5_000) -> list[Candle]:
-    """Fetch a chronological, deduplicated candle window without assuming one API response is sufficient."""
+def fetch_candles(symbol: str, timeframe: str, limit: int, end_time: int | None = None) -> list[Candle]:
+    """Fetch a chronological candle window from Hyperliquid's capped snapshot endpoint."""
     if limit <= 0:
         return []
+    if limit > MAX_CANDLE_SNAPSHOT:
+        raise ValueError(f"Hyperliquid candleSnapshot supports at most {MAX_CANDLE_SNAPSHOT} recent candles; use an archived source for longer history")
     interval_ms = INTERVAL_MS.get(timeframe)
     if interval_ms is None:
         raise ValueError(f"unsupported timeframe: {timeframe}")
-    if batch_limit <= 0:
-        raise ValueError("batch_limit must be positive")
-
     window_end = end_time if end_time is not None else int(time.time() * 1000)
     window_start = window_end - interval_ms * limit
-    candles_by_open_time: dict[int, Candle] = {}
-    cursor = window_start
-
-    while cursor < window_end:
-        batch_end = min(cursor + interval_ms * batch_limit, window_end)
-        payload = {
-            "type": "candleSnapshot",
-            "req": {"coin": symbol, "interval": timeframe, "startTime": cursor, "endTime": batch_end},
-        }
-        request = urllib.request.Request(API_URL, data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(request, timeout=20) as response:
-            data = json.loads(response.read().decode("utf-8"))
-        for raw in data:
-            candle = normalize_candle(raw, symbol, timeframe)
-            if window_start <= candle.open_time < window_end:
-                candles_by_open_time[candle.open_time] = candle
-        cursor = batch_end
-
-    return sorted(candles_by_open_time.values(), key=lambda candle: candle.open_time)[-limit:]
+    payload = {
+        "type": "candleSnapshot",
+        "req": {"coin": symbol, "interval": timeframe, "startTime": window_start, "endTime": window_end},
+    }
+    request = urllib.request.Request(API_URL, data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    candles = {candle.open_time: candle for candle in (normalize_candle(raw, symbol, timeframe) for raw in data)}
+    return [candle for candle in sorted(candles.values(), key=lambda item: item.open_time) if window_start <= candle.open_time < window_end][-limit:]
