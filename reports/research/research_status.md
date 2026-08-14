@@ -2,8 +2,8 @@
 
 ## Classification
 
-**NEEDS MORE RESEARCH — baseline controls in progress.** No strategy candidate
-has been selected, and no final holdout has been run.
+**NO ROBUST CANDIDATE.** The completed baseline controls are rejected; no final
+holdout has been run.
 
 ## What was verified
 
@@ -30,6 +30,11 @@ Only train and validation are currently being used for selection.
 
 ## Required next step
 
-Complete the remaining baseline controls, record every result in the immutable
-experiment ledger, and test only bounded hypotheses that survive the controls.
-The final holdout remains locked until a candidate passes validation gates.
+All currently defined zone-filter controls have been evaluated and recorded in
+the immutable ledger. The penalty-only baseline is negative across the locked
+periods (785 trades, -0.081R aggregate expectancy, PF 0.888), and the hard
+filters sacrifice sample size without producing cross-symbol robustness.
+
+The final holdout remains locked. A future research cycle must begin with a new
+predeclared hypothesis and preserve the same data, period, and sample gates;
+it must not tune to these validation outcomes.

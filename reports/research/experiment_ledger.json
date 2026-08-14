@@ -40,5 +40,16 @@
     "reason": "The train aggregate is -0.188R expectancy with PF 0.728 over 84 trades; ETH and SOL are negative in train, and the positive validation aggregate has only 28 total trades.",
     "strategy_change": false,
     "report_path": "reports/validation/20260814084708"
+  },
+  {
+    "experiment_id": "R004",
+    "timestamp": "2026-08-14T09:15:00Z",
+    "kind": "baseline_control",
+    "baseline_commit": "ae11bba",
+    "hypothesis": "The unmodified nested MTF zone-penalty baseline is profitable and robust across BTC, ETH, and SOL.",
+    "decision": "REJECT",
+    "reason": "Across 785 locked-split trades the aggregate expectancy is -0.081R and PF 0.888. ETH and SOL are negative in both train and validation; BTC validation is also negative. No candidate qualifies for final holdout evaluation.",
+    "strategy_change": false,
+    "report_path": "reports/validation/20260814090123"
   }
 ]
