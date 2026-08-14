@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bisect import bisect_right
 from dataclasses import dataclass
 from datetime import datetime, UTC
 
@@ -34,12 +35,14 @@ class BacktestResult:
 
 def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | None, trade_repo: TradeRepository | None, config: AppConfig, symbol: str, timeframe: str, start_time: int | None = None, end_time: int | None = None, config_name: str | None = None, start_date: str | None = None, end_date: str | None = None) -> BacktestResult:
     candles = candle_repo.all(symbol, timeframe)
-    candles = [candle for candle in candles if (start_time is None or candle.open_time >= start_time) and (end_time is None or candle.open_time < end_time)]
+    candles = [candle for candle in candles if end_time is None or candle.open_time < end_time]
     entry_timeframe = config.market.entry_timeframe or timeframe
     local_timeframe = config.market.local_timeframe or entry_timeframe
     regime_timeframe = config.market.regime_timeframe or local_timeframe
     local_all = candle_repo.all(symbol, local_timeframe) if config.strategy.scoring.use_nested_mtf else []
     regime_all = candle_repo.all(symbol, regime_timeframe) if config.strategy.scoring.use_nested_mtf else []
+    local_close_times = [(candle.close_time if candle.close_time is not None else candle.open_time + _TIMEFRAME_MS[local_timeframe]) for candle in local_all]
+    regime_close_times = [(candle.close_time if candle.close_time is not None else candle.open_time + _TIMEFRAME_MS[regime_timeframe]) for candle in regime_all]
     signals: list[Signal] = []
     trades: list[Trade] = []
     open_trades_at_end: list[Trade] = []
@@ -58,6 +61,7 @@ def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | 
     }
 
     for index, candle in enumerate(candles):
+        in_period = start_time is None or candle.open_time >= start_time
         if open_trade is not None:
             closed = _maybe_close_trade(open_trade, candle, config.risk.fee_percent, config.risk.slippage_percent)
             if closed is not None:
@@ -83,23 +87,25 @@ def run_backtest(candle_repo: CandleRepository, signal_repo: SignalRepository | 
             if config.strategy.scoring.use_nested_mtf:
                 as_of = entry_slice[-1].close_time if entry_slice[-1].close_time is not None else entry_slice[-1].open_time + _TIMEFRAME_MS[entry_timeframe]
                 window = max(config.market.warmup_candles, config.strategy.trend.ema_slow + config.strategy.pivots.right + config.strategy.triangle.max_candles)
-                local_closed = closed_candles_as_of(local_all, as_of, local_timeframe)
-                regime_closed = closed_candles_as_of(regime_all, as_of, regime_timeframe)
-                context = MarketContext(symbol, entry_timeframe, local_timeframe, regime_timeframe, entry_slice[-window:], local_closed[-window:], regime_closed[-window:])
+                local_end = bisect_right(local_close_times, as_of)
+                regime_end = bisect_right(regime_close_times, as_of)
+                context = MarketContext(symbol, entry_timeframe, local_timeframe, regime_timeframe, entry_slice[-window:], local_all[max(0, local_end - window):local_end], regime_all[max(0, regime_end - window):regime_end])
                 signal = evaluate(context.entry_candles, config, symbol, entry_timeframe, equity, context)
             else:
                 signal = evaluate(entry_slice, config, symbol, timeframe, equity)
-            signals.append(signal)
-            if signal_repo:
-                signal_repo.insert(signal)
-            if signal.decision == Decision.ACCEPTED:
+            if in_period:
+                signals.append(signal)
+                if signal_repo:
+                    signal_repo.insert(signal)
+            if in_period and signal.decision == Decision.ACCEPTED:
                 if open_trade is not None:
                     funnel["skipped_already_in_position"] += 1
                 elif pending_signal is not None:
                     funnel["skipped_pending_signal_exists"] += 1
                 else:
                     pending_signal = signal
-        equity_curve.append((candle.open_time, equity))
+        if in_period:
+            equity_curve.append((candle.open_time, equity))
 
     if pending_signal is not None:
         funnel["skipped_end_of_backtest"] += 1

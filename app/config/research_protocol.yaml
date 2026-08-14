@@ -1,5 +1,5 @@
 protocol_version: 1
-status: blocked_pending_adequate_common_history
+status: ready_for_train_validation_research
 research_data:
   provider: binance_usdm
   market_type: perpetual
@@ -24,7 +24,10 @@ split:
   train_fraction: 0.60
   validation_fraction: 0.20
   holdout_fraction: 0.20
-  boundaries: null
+  boundaries:
+    train: [2025-01-01, 2025-12-22]
+    validation: [2025-12-22, 2026-04-19]
+    final_holdout: [2026-04-19, 2026-08-15]
   boundary_rule: >-
     Freeze boundaries only after every research symbol has a continuous common
     15m/1h/4h overlap that meets the minimum-candle requirements.

@@ -261,7 +261,7 @@ def test_backtest_time_filters_restrict_entry_candles(tmp_path, monkeypatch) -> 
         repo = CandleRepository(connection)
         repo.insert_many([candle(1), candle(2), candle(3), candle(4)])
         run_backtest(repo, None, None, AppConfig(), "BTC", "1h", start_time=2, end_time=4)
-    assert seen == [3]
+    assert seen == [2, 3]
 
 
 def test_scoring_candidate_funnel_invariants_and_bucket_sum() -> None:
