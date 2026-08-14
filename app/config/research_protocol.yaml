@@ -1,0 +1,29 @@
+protocol_version: 1
+status: blocked_pending_adequate_common_history
+symbols:
+  - BTC
+  - ETH
+  - SOL
+timeframes:
+  15m:
+    minimum_candles_per_symbol: 20000
+  1h:
+    minimum_candles_per_symbol: 5000
+  4h:
+    minimum_candles_per_symbol: 2000
+split:
+  method: chronological_three_way
+  train_fraction: 0.60
+  validation_fraction: 0.20
+  holdout_fraction: 0.20
+  boundaries: null
+  boundary_rule: >-
+    Freeze boundaries only after every research symbol has a continuous common
+    15m/1h/4h overlap that meets the minimum-candle requirements.
+guardrails:
+  validation_minimum_combined_trades: 50
+  complete_research_minimum_closed_trades: 100
+  validation_minimum_expectancy_r: 0.0
+  validation_preferred_expectancy_r: 0.15
+  validation_minimum_profit_factor: 1.20
+  final_holdout_runs_per_frozen_candidate: 1

@@ -4,7 +4,7 @@ from app.config.settings import AppConfig
 from app.core.types import Candle, Decision, Side, Signal
 from app.data.db import connect, init_db
 from app.data.repositories import CandleRepository, SignalRepository, TradeRepository
-from app.exchange.hyperliquid_data import normalize_candle
+from app.exchange.hyperliquid_data import fetch_candles, normalize_candle
 from app.runtime.paper import PaperState, evaluate_new_closed_candles
 
 
@@ -22,6 +22,40 @@ def test_duplicate_fetched_candles_are_not_inserted(tmp_path) -> None:
         repo = CandleRepository(connection)
         repo.insert_many([candle, candle])
         assert len(repo.all("BTC", "1h")) == 1
+
+
+def test_fetch_candles_paginates_and_deduplicates(monkeypatch) -> None:
+    requests: list[tuple[int, int]] = []
+
+    class Response:
+        def __init__(self, payload: bytes) -> None:
+            self.payload = payload
+
+        def read(self) -> bytes:
+            return self.payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            return None
+
+    def fake_urlopen(request, timeout):
+        import json
+
+        body = json.loads(request.data)
+        start = body["req"]["startTime"]
+        end = body["req"]["endTime"]
+        requests.append((start, end))
+        return Response(json.dumps([
+            {"t": start, "T": start + 900_000, "o": "1", "h": "2", "l": "0.5", "c": "1.5"},
+            {"t": end - 900_000, "T": end, "o": "1", "h": "2", "l": "0.5", "c": "1.5"},
+        ]).encode())
+
+    monkeypatch.setattr("app.exchange.hyperliquid_data.urllib.request.urlopen", fake_urlopen)
+    candles = fetch_candles("BTC", "15m", 10, end_time=9_000_000, batch_limit=4)
+    assert requests == [(0, 3_600_000), (3_600_000, 7_200_000), (7_200_000, 9_000_000)]
+    assert [candle.open_time for candle in candles] == [0, 2_700_000, 3_600_000, 6_300_000, 7_200_000, 8_100_000]
 
 
 def test_paper_runner_evaluates_only_new_closed_candles_and_trades_locally(tmp_path, monkeypatch) -> None:

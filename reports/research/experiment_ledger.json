@@ -1,0 +1,12 @@
+[
+  {
+    "experiment_id": "R000",
+    "timestamp": "2026-08-14T07:36:00Z",
+    "kind": "data_quality_audit",
+    "baseline_commit": "fdd493b",
+    "hypothesis": "The existing data source can provide the minimum continuous common history required for unbiased multi-symbol research.",
+    "decision": "BLOCKED",
+    "reason": "The public endpoint returned no BTC 15m candles for a window ending 2026-05-18T15:45:00Z. Existing BTC/ETH/SOL 15m histories are below the 20,000-candle requirement.",
+    "strategy_change": false
+  }
+]

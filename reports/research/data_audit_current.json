@@ -1,0 +1,81 @@
+{
+  "BTC": {
+    "15m": {
+      "candles": 8416,
+      "minimum_required": 20000,
+      "meets_minimum": false,
+      "internal_gaps": 0,
+      "first": "2026-05-18T15:45:00Z",
+      "last": "2026-08-14T07:30:00Z"
+    },
+    "1h": {
+      "candles": 5580,
+      "minimum_required": 5000,
+      "meets_minimum": true,
+      "internal_gaps": 1,
+      "first": "2024-01-01T00:00:00Z",
+      "last": "2026-08-02T18:00:00Z"
+    },
+    "4h": {
+      "candles": 2000,
+      "minimum_required": 2000,
+      "meets_minimum": true,
+      "internal_gaps": 0,
+      "first": "2025-09-03T12:00:00Z",
+      "last": "2026-08-02T16:00:00Z"
+    }
+  },
+  "ETH": {
+    "15m": {
+      "candles": 5528,
+      "minimum_required": 20000,
+      "meets_minimum": false,
+      "internal_gaps": 0,
+      "first": "2026-06-17T17:45:00Z",
+      "last": "2026-08-14T07:30:00Z"
+    },
+    "1h": {
+      "candles": 5000,
+      "minimum_required": 5000,
+      "meets_minimum": true,
+      "internal_gaps": 0,
+      "first": "2026-01-12T13:00:00Z",
+      "last": "2026-08-08T20:00:00Z"
+    },
+    "4h": {
+      "candles": 2000,
+      "minimum_required": 2000,
+      "meets_minimum": true,
+      "internal_gaps": 0,
+      "first": "2025-09-09T16:00:00Z",
+      "last": "2026-08-08T20:00:00Z"
+    }
+  },
+  "SOL": {
+    "15m": {
+      "candles": 5527,
+      "minimum_required": 20000,
+      "meets_minimum": false,
+      "internal_gaps": 0,
+      "first": "2026-06-17T18:00:00Z",
+      "last": "2026-08-14T07:30:00Z"
+    },
+    "1h": {
+      "candles": 5000,
+      "minimum_required": 5000,
+      "meets_minimum": true,
+      "internal_gaps": 0,
+      "first": "2026-01-12T13:00:00Z",
+      "last": "2026-08-08T20:00:00Z"
+    },
+    "4h": {
+      "candles": 2000,
+      "minimum_required": 2000,
+      "meets_minimum": true,
+      "internal_gaps": 0,
+      "first": "2025-09-09T16:00:00Z",
+      "last": "2026-08-08T20:00:00Z"
+    }
+  },
+  "research_ready": false
+}

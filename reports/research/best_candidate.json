@@ -1,0 +1,6 @@
+{
+  "status": "no_candidate",
+  "reason": "Research is blocked before strategy evaluation because the required continuous common historical dataset is unavailable.",
+  "strategy_version": null,
+  "final_holdout_executed": false
+}

@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-08-14T07:36:00Z",
+  "status": "blocked_pending_adequate_common_history",
+  "source": "Hyperliquid candleSnapshot public endpoint",
+  "finding": "The endpoint returned zero BTC 15m candles for an explicit window ending before 2026-05-18T15:45:00Z. It cannot backfill the historical range required by this protocol.",
+  "required_minimums": {"15m": 20000, "1h": 5000, "4h": 2000},
+  "observed_counts": {
+    "BTC": {"15m": 8416, "1h": 5580, "4h": 2000, "internal_gaps": {"1h": 1}},
+    "ETH": {"15m": 5528, "1h": 5000, "4h": 2000},
+    "SOL": {"15m": 5527, "1h": 5000, "4h": 2000}
+  },
+  "next_requirement": "Import a verified historical source with a continuous common BTC/ETH/SOL 15m/1h/4h overlap before freezing train/validation/holdout boundaries or running strategy experiments."
+}
