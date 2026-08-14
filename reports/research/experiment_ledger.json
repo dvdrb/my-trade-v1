@@ -84,5 +84,16 @@
     "reason": "Train improved modestly but validation expectancy is negative on BTC, ETH, and SOL and every validation PF is below 1. The containment threshold was reverted.",
     "strategy_change": false,
     "report_path": "reports/validation/20260814105020"
+  },
+  {
+    "experiment_id": "R008",
+    "timestamp": "2026-08-14T11:18:00Z",
+    "kind": "child_triangle_type",
+    "baseline_commit": "95301e2",
+    "hypothesis": "Excluding ascending child triangles produces robust positive expectancy across markets.",
+    "decision": "INCONCLUSIVE",
+    "reason": "Validation is positive across BTC, ETH, and SOL (194 trades, +0.029R, PF 1.042), but it misses the qualification gates and train remains negative. The experiment is not retained or stacked.",
+    "strategy_change": false,
+    "report_path": "reports/validation/20260814110523"
   }
 ]
