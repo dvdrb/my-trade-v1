@@ -106,5 +106,16 @@
     "reason": "BTC and SOL validation improved, but ETH remains negative in both periods and aggregate PF is below 1. The alignment filter was reverted.",
     "strategy_change": false,
     "report_path": "reports/validation/20260814112009"
+  },
+  {
+    "experiment_id": "R010",
+    "timestamp": "2026-08-14T11:47:00Z",
+    "kind": "breakout_quality",
+    "baseline_commit": "3b67cde",
+    "hypothesis": "A 50% breakout body minimum improves nested-breakout robustness.",
+    "decision": "REJECT",
+    "reason": "The train improvement did not generalize: validation expectancy is negative for BTC, ETH, and SOL and PF is below 1 for every symbol.",
+    "strategy_change": false,
+    "report_path": "reports/validation/20260814113415"
   }
 ]
