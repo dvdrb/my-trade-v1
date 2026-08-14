@@ -98,6 +98,7 @@ def main() -> None:
         args.output.write_text(rendered + "\n", encoding="utf-8")
     if not result["research_ready"]:
         raise SystemExit("Research data audit failed: do not run optimization or validation splits.")
+    print("OVERALL: PASS")
 
 
 if __name__ == "__main__":
