@@ -27,6 +27,9 @@ data/*.sqlite3
 data/*.db
 logs/*
 reports/backtests/
+data/research/raw/
+data/research/canonical/
+data/research/manifests/
 *.sqlite-journal
 *.sqlite-wal
 *.sqlite-shm

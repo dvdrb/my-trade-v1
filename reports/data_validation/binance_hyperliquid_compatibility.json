@@ -1,0 +1,36 @@
+{
+  "generated_at": "2026-08-14T08:09:00.798497+00:00",
+  "purpose": "cross_venue_compatibility_only",
+  "symbols": {
+    "BTC": {
+      "status": "ok",
+      "overlapping_candles": 1200,
+      "mean_close_deviation": 0.00010395891819052669,
+      "mean_high_low_deviation": 0.00016186242514930015,
+      "triangle_candidate_agreement": 0.9975,
+      "breakout_direction_agreement": 0.9725,
+      "accepted_signal_agreement": 0.095,
+      "nested_setup_agreement": "not computed: this diagnostic intentionally uses the 15m-only scoring model"
+    },
+    "ETH": {
+      "status": "ok",
+      "overlapping_candles": 1200,
+      "mean_close_deviation": 0.00011963446653595447,
+      "mean_high_low_deviation": 0.00020047212930766802,
+      "triangle_candidate_agreement": 0.955,
+      "breakout_direction_agreement": 0.955,
+      "accepted_signal_agreement": 0.1325,
+      "nested_setup_agreement": "not computed: this diagnostic intentionally uses the 15m-only scoring model"
+    },
+    "SOL": {
+      "status": "ok",
+      "overlapping_candles": 1200,
+      "mean_close_deviation": 0.00017010526890355918,
+      "mean_high_low_deviation": 0.0002861738329269118,
+      "triangle_candidate_agreement": 0.99,
+      "breakout_direction_agreement": 0.97,
+      "accepted_signal_agreement": 0.0925,
+      "nested_setup_agreement": "not computed: this diagnostic intentionally uses the 15m-only scoring model"
+    }
+  }
+}

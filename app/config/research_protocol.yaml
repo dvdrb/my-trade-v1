@@ -1,5 +1,13 @@
 protocol_version: 1
 status: blocked_pending_adequate_common_history
+research_data:
+  provider: binance_usdm
+  market_type: perpetual
+  canonical_timeframe: 15m
+  symbols:
+    BTC: BTCUSDT
+    ETH: ETHUSDT
+    SOL: SOLUSDT
 symbols:
   - BTC
   - ETH

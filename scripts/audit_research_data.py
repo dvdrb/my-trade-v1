@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import hashlib
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -62,7 +63,9 @@ def common_history(repo: CandleRepository, symbols: list[str]) -> dict[str, obje
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fail-closed data-quality audit for nested-MTF research.")
     parser.add_argument("--symbols", nargs="+", default=["BTC", "ETH", "SOL"])
-    parser.add_argument("--db", default=str(DEFAULT_DB_PATH))
+    parser.add_argument("--provider", choices=["hyperliquid", "binance_usdm"], default="binance_usdm")
+    parser.add_argument("--db", default="data/research.sqlite3")
+    parser.add_argument("--manifest", type=Path, default=Path("data/research/manifests/binance_usdm_manifest.json"))
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
@@ -77,7 +80,17 @@ def main() -> None:
         for timeframe in REQUIREMENTS
     )
     common_ready = all(bool(values["meets_minimum"]) for values in result["common_history"].values())
-    result["research_ready"] = individual_ready and common_ready
+    provider_checks: dict[str, bool] = {}
+    if args.provider == "binance_usdm":
+        manifest = json.loads(args.manifest.read_text(encoding="utf-8")) if args.manifest.exists() else {}
+        canonical = Path("data/research/canonical/binance_usdm_15m.csv")
+        provider_checks = {
+            "archive_checksums": manifest.get("archive_checksum_status") == "PASS",
+            "canonical_sha256": canonical.exists() and manifest.get("canonical_sha256") == hashlib.sha256(canonical.read_bytes()).hexdigest(),
+            "provider": manifest.get("provider") == "binance_usdm",
+        }
+    result["provider_checks"] = provider_checks
+    result["research_ready"] = individual_ready and common_ready and all(provider_checks.values())
     rendered = json.dumps(result, indent=2)
     print(rendered)
     if args.output:
