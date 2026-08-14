@@ -51,5 +51,16 @@
     "reason": "Across 785 locked-split trades the aggregate expectancy is -0.081R and PF 0.888. ETH and SOL are negative in both train and validation; BTC validation is also negative. No candidate qualifies for final holdout evaluation.",
     "strategy_change": false,
     "report_path": "reports/validation/20260814090123"
+  },
+  {
+    "experiment_id": "R005",
+    "timestamp": "2026-08-14T13:25:00Z",
+    "kind": "structural_diagnostic",
+    "baseline_commit": "24fcf82",
+    "hypothesis": "Trade-level structural diagnostics identify a cross-symbol effect large enough to justify one bounded filter experiment.",
+    "decision": "INCONCLUSIVE",
+    "reason": "The 571-trade train dataset shows only weak, market-specific effects. Parent 1h score is weakly negative across BTC/ETH/SOL, while convergence and room-to-move do not agree across symbols. No strategy rule was changed.",
+    "strategy_change": false,
+    "report_path": "reports/research/structural_diagnostics.json"
   }
 ]

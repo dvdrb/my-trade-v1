@@ -12,6 +12,7 @@ from app.strategy.candidates import TriangleCandidate
 from app.strategy.nesting import is_child_inside_parent, score_nested_relationship
 from app.strategy.nested import _mtf_zone_score, _record_parent_diagnostics, _should_hard_reject_zone
 from app.strategy.risk import RiskPlan
+from app.strategy.structural_features import structural_features
 from app.core.types import StrongZone
 
 
@@ -160,3 +161,14 @@ def test_period_performance_reports_are_populated() -> None:
     assert summary["performance_by_month"]["2026-01"]["trades"] == 1
     assert summary["performance_by_quarter"]["2026-Q1"]["max_losing_streak"] == 0
     assert summary["performance_by_year"]["2026"]["profit_factor"] == 10
+
+
+def test_structural_features_describe_parent_child_breakout_without_changing_signal_logic() -> None:
+    config = load_config("app/config/strategy_nested_mtf_zone_penalty.yaml")
+    parent, child = _candidate(0, 10, 0, 10_000), _candidate(2, 6, 2_000, 6_000)
+    candles = [_candle(index * 1_000, 105, 95, (index + 1) * 1_000) for index in range(220)]
+    features = structural_features(child, parent, parent, candles, candles, candles, Side.LONG, RiskPlan(100, 95, 110, 2, 1), [], [], [], config)
+    assert features["triangle_type"] == "symmetrical"
+    assert features["parent_1h_exists"] is True
+    assert features["breakout_body_percent"] == 0.0
+    assert "distance_to_nearest_4h_opposite_zone_r" in features

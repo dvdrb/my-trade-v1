@@ -1,0 +1,161 @@
+{
+  "created_at": "2026-08-14T10:31:50.410806+00:00",
+  "hypotheses": [
+    {
+      "description": "parent_4h_convergence has correlation -0.117 with realized R on train",
+      "structural_rationale": "observed winner/loser separation; requires validation before use",
+      "train_sample_size": 109,
+      "observed_expectancy_difference": -0.050323060474295245,
+      "symbols_affected": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "confidence_level": "exploratory",
+      "proposed_experiment": "Test one bounded threshold or score adjustment for parent_4h_convergence only if cross-symbol buckets agree."
+    },
+    {
+      "description": "parent_4h_distance_to_apex has correlation 0.115 with realized R on train",
+      "structural_rationale": "observed winner/loser separation; requires validation before use",
+      "train_sample_size": 109,
+      "observed_expectancy_difference": 803469866.5278019,
+      "symbols_affected": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "confidence_level": "exploratory",
+      "proposed_experiment": "Test one bounded threshold or score adjustment for parent_4h_distance_to_apex only if cross-symbol buckets agree."
+    },
+    {
+      "description": "distance_to_nearest_1h_opposite_zone_r has correlation -0.110 with realized R on train",
+      "structural_rationale": "observed winner/loser separation; requires validation before use",
+      "train_sample_size": 502,
+      "observed_expectancy_difference": -0.44039510138178795,
+      "symbols_affected": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "confidence_level": "exploratory",
+      "proposed_experiment": "Test one bounded threshold or score adjustment for distance_to_nearest_1h_opposite_zone_r only if cross-symbol buckets agree."
+    },
+    {
+      "description": "distance_to_nearest_4h_opposite_zone_r has correlation -0.094 with realized R on train",
+      "structural_rationale": "observed winner/loser separation; requires validation before use",
+      "train_sample_size": 448,
+      "observed_expectancy_difference": -0.8473308363200442,
+      "symbols_affected": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "confidence_level": "exploratory",
+      "proposed_experiment": "Test one bounded threshold or score adjustment for distance_to_nearest_4h_opposite_zone_r only if cross-symbol buckets agree."
+    },
+    {
+      "description": "parent_1h_convergence has correlation -0.091 with realized R on train",
+      "structural_rationale": "observed winner/loser separation; requires validation before use",
+      "train_sample_size": 499,
+      "observed_expectancy_difference": -0.04350241146478612,
+      "symbols_affected": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "confidence_level": "exploratory",
+      "proposed_experiment": "Test one bounded threshold or score adjustment for parent_1h_convergence only if cross-symbol buckets agree."
+    },
+    {
+      "description": "distance_to_apex has correlation 0.091 with realized R on train",
+      "structural_rationale": "observed winner/loser separation; requires validation before use",
+      "train_sample_size": 571,
+      "observed_expectancy_difference": 36.192456890548094,
+      "symbols_affected": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "confidence_level": "exploratory",
+      "proposed_experiment": "Test one bounded threshold or score adjustment for distance_to_apex only if cross-symbol buckets agree."
+    },
+    {
+      "description": "score_parent_1h_structure has correlation -0.080 with realized R on train",
+      "structural_rationale": "observed winner/loser separation; requires validation before use",
+      "train_sample_size": 571,
+      "observed_expectancy_difference": -1.2190110301991863,
+      "symbols_affected": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "confidence_level": "exploratory",
+      "proposed_experiment": "Test one bounded threshold or score adjustment for score_parent_1h_structure only if cross-symbol buckets agree."
+    },
+    {
+      "description": "entry_breakouts_with_4h_only has correlation 0.066 with realized R on train",
+      "structural_rationale": "observed winner/loser separation; requires validation before use",
+      "train_sample_size": 571,
+      "observed_expectancy_difference": 0.11384932533733136,
+      "symbols_affected": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "confidence_level": "exploratory",
+      "proposed_experiment": "Test one bounded threshold or score adjustment for entry_breakouts_with_4h_only only if cross-symbol buckets agree."
+    },
+    {
+      "description": "4h_trend_strength has correlation -0.066 with realized R on train",
+      "structural_rationale": "observed winner/loser separation; requires validation before use",
+      "train_sample_size": 516,
+      "observed_expectancy_difference": -0.0074436145547367855,
+      "symbols_affected": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "confidence_level": "exploratory",
+      "proposed_experiment": "Test one bounded threshold or score adjustment for 4h_trend_strength only if cross-symbol buckets agree."
+    },
+    {
+      "description": "scored_nested_setups has correlation 0.065 with realized R on train",
+      "structural_rationale": "observed winner/loser separation; requires validation before use",
+      "train_sample_size": 571,
+      "observed_expectancy_difference": 0.20885093167701863,
+      "symbols_affected": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "confidence_level": "exploratory",
+      "proposed_experiment": "Test one bounded threshold or score adjustment for scored_nested_setups only if cross-symbol buckets agree."
+    },
+    {
+      "description": "parent_4h_distance_to_upper_boundary has correlation -0.062 with realized R on train",
+      "structural_rationale": "observed winner/loser separation; requires validation before use",
+      "train_sample_size": 109,
+      "observed_expectancy_difference": -0.06448583431473665,
+      "symbols_affected": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "confidence_level": "exploratory",
+      "proposed_experiment": "Test one bounded threshold or score adjustment for parent_4h_distance_to_upper_boundary only if cross-symbol buckets agree."
+    },
+    {
+      "description": "parent_4h_child_position has correlation 0.062 with realized R on train",
+      "structural_rationale": "observed winner/loser separation; requires validation before use",
+      "train_sample_size": 109,
+      "observed_expectancy_difference": 0.06448583431473676,
+      "symbols_affected": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "confidence_level": "exploratory",
+      "proposed_experiment": "Test one bounded threshold or score adjustment for parent_4h_child_position only if cross-symbol buckets agree."
+    }
+  ]
+}

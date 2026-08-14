@@ -9,6 +9,7 @@ from app.strategy.nesting import find_nested_triangle_setups, score_nested_relat
 from app.strategy.pivots import detect_pivots
 from app.strategy.risk import RiskPlan, calculate_risk_plan
 from app.strategy.scoring import _breakout_quality, _risk_quality, risk_percent_for_score
+from app.strategy.structural_features import structural_features
 from app.strategy.trend import ema_trend, structure_trend
 from app.strategy.zones import build_zones, nearest_resistance, nearest_support
 
@@ -133,6 +134,7 @@ def _nested_score(parent_4h, parent_1h, child, context, entry_pivots, regime_piv
     blocked_timeframes = sorted({str(block["timeframe"]) for block in zone_blocks})
     blocked_kinds = sorted({str(block["zone_kind"]) for block in zone_blocks})
     metadata = {"score_total": total, "score_parent_4h_structure": score_4h, "score_parent_1h_structure": score_1h, "score_nested_triangle": score_nested, "score_entry_breakout": score_breakout, "score_mtf_zones": score_zones, "score_risk_quality": score_risk, "parent_4h_triangle_type": parent_4h.triangle_type if parent_4h else None, "parent_1h_triangle_type": parent_1h.triangle_type if parent_1h else None, "child_triangle_type": child.triangle_type, "nested_context": nested_context, "parent_timeframe_alignment": alignment, "entry_trend_direction": entry_trend.value, "local_trend_direction": local_trend.value, "regime_trend_direction": regime_trend.value, "mtf_zone_context": zone_context, "mtf_opposite_zone_before_target": bool(zone_blocks), "mtf_zone_blocks": zone_blocks, "would_be_blocked_by_strict_mtf_zone": bool(zone_blocks), "would_be_blocked_timeframes": blocked_timeframes, "would_be_blocked_zone_kinds": blocked_kinds, "would_be_blocked_min_distance_to_entry_r": min((float(block["distance_to_entry_r"]) for block in zone_blocks), default=None), "would_be_blocked_min_distance_to_target_r": min((float(block["distance_to_target_r"]) for block in zone_blocks), default=None)}
+    metadata.update(structural_features(child, parent_1h, parent_4h, context.entry_candles, context.local_candles, context.regime_candles, side, risk, entry_zones, local_zones, regime_zones, config))
     return total, metadata, ["nested MTF breakout", nested_context, zone_context]
 
 

@@ -1,6 +1,19 @@
 {
   "status": "no_candidate",
-  "reason": "Research is blocked before strategy evaluation because the required continuous common historical dataset is unavailable.",
-  "strategy_version": null,
+  "current_best_baseline": "strategy_nested_mtf_zone_penalty",
+  "commit": "24fcf82",
+  "config": "app/config/strategy_nested_mtf_zone_penalty.yaml",
+  "train_metrics": {
+    "trades": 571,
+    "expectancy_r": -0.080087024438556,
+    "profit_factor": 0.8878384572761806
+  },
+  "validation_metrics": {
+    "trades": 214,
+    "expectancy_r": -0.08205925001514252,
+    "profit_factor": 0.8871754276352697
+  },
+  "reason": "No structural modification has yet demonstrated cross-symbol train evidence. The baseline remains the control, not a candidate.",
+  "known_weaknesses": ["negative expectancy in train and validation", "no predictive score monotonicity", "structural effects currently differ by symbol"],
   "final_holdout_executed": false
 }
