@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-14T08:09:00.798497+00:00",
+  "generated_at": "2026-08-14T08:09:55.190968+00:00",
   "purpose": "cross_venue_compatibility_only",
   "symbols": {
     "BTC": {
@@ -10,7 +10,9 @@
       "triangle_candidate_agreement": 0.9975,
       "breakout_direction_agreement": 0.9725,
       "accepted_signal_agreement": 0.095,
-      "nested_setup_agreement": "not computed: this diagnostic intentionally uses the 15m-only scoring model"
+      "nested_setup_agreement": 0.43,
+      "nested_breakout_direction_agreement": 0.9,
+      "nested_accepted_signal_agreement": 0.0
     },
     "ETH": {
       "status": "ok",
@@ -20,7 +22,9 @@
       "triangle_candidate_agreement": 0.955,
       "breakout_direction_agreement": 0.955,
       "accepted_signal_agreement": 0.1325,
-      "nested_setup_agreement": "not computed: this diagnostic intentionally uses the 15m-only scoring model"
+      "nested_setup_agreement": 0.475,
+      "nested_breakout_direction_agreement": 0.88,
+      "nested_accepted_signal_agreement": 0.0
     },
     "SOL": {
       "status": "ok",
@@ -30,7 +34,9 @@
       "triangle_candidate_agreement": 0.99,
       "breakout_direction_agreement": 0.97,
       "accepted_signal_agreement": 0.0925,
-      "nested_setup_agreement": "not computed: this diagnostic intentionally uses the 15m-only scoring model"
+      "nested_setup_agreement": 0.765,
+      "nested_breakout_direction_agreement": 0.955,
+      "nested_accepted_signal_agreement": 0.0
     }
   }
 }
