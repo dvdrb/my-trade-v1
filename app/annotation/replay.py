@@ -7,12 +7,16 @@ TIMEFRAME_MS = {"15m": 15 * 60_000, "1h": 60 * 60_000, "4h": 4 * 60 * 60_000}
 
 
 def visible_candles(candles: list[Candle], replay_time: int) -> list[Candle]:
-    """Return only candles whose opening timestamp was knowable at replay time."""
-    return [candle for candle in candles if candle.open_time <= replay_time]
+    """Return only fully knowable candles at the replay point.
+
+    Aggregated 1h/4h OHLC values are future information until their close.  Sources
+    without a close_time are treated as already-finalized legacy rows.
+    """
+    return [candle for candle in candles if candle.open_time <= replay_time and (candle.close_time is None or candle.close_time <= replay_time)]
 
 
 def advance_time(candles: list[Candle], replay_time: int, count: int = 1) -> int:
-    known = [candle.open_time for candle in candles if candle.open_time > replay_time]
+    known = [candle.close_time if candle.close_time is not None else candle.open_time for candle in candles if (candle.close_time if candle.close_time is not None else candle.open_time) > replay_time]
     return known[min(count - 1, len(known) - 1)] if known else replay_time
 
 

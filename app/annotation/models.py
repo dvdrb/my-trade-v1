@@ -149,3 +149,22 @@ class SimulatedTrade(BaseModel):
     realized_r: float | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class BotReviewVerdict(StrEnum):
+    CORRECT = "correct"
+    WRONG = "wrong"
+    CLOSE_BUT_REDRAW = "close_but_redraw"
+
+
+class BotCandidateReview(BaseModel):
+    review_id: str = Field(default_factory=lambda: str(uuid4()))
+    annotation_id: str
+    candidate: dict[str, object]
+    verdict: BotReviewVerdict
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ScreenshotRequest(BaseModel):
+    timeframe: Literal["15m", "1h", "4h"]
+    image_data_url: str

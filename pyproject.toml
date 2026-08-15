@@ -16,6 +16,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest",
+  "httpx2",
 ]
 
 [build-system]

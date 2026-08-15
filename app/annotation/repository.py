@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import sqlite3
 from datetime import UTC, datetime
+from pathlib import Path
+from uuid import uuid4
 
-from app.annotation.models import HumanAnnotation, ReplaySession, SimulatedTrade
+from app.annotation.models import BotCandidateReview, HumanAnnotation, ReplaySession, SimulatedTrade
 
 
 def _now() -> str:
@@ -28,6 +30,9 @@ class AnnotationRepository:
     def get_session(self, session_id: str) -> ReplaySession | None:
         row = self.connection.execute("SELECT * FROM replay_sessions WHERE session_id = ?", (session_id,)).fetchone()
         return _session(row) if row else None
+
+    def sessions(self) -> list[ReplaySession]:
+        return [_session(row) for row in self.connection.execute("SELECT * FROM replay_sessions ORDER BY updated_at DESC")]
 
     def update_session_time(self, session_id: str, replay_time: int) -> ReplaySession:
         self.connection.execute("UPDATE replay_sessions SET replay_time = ?, updated_at = ? WHERE session_id = ?",
@@ -83,6 +88,39 @@ class AnnotationRepository:
         if session_id:
             query += " WHERE session_id = ?"; args = (session_id,)
         return [SimulatedTrade.model_validate_json(row["payload"]) for row in self.connection.execute(query, args)]
+
+    def save_screenshot(self, annotation_id: str, timeframe: str, image_data: bytes, root: str | Path) -> str:
+        directory = Path(root) / annotation_id
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / f"{timeframe}.png"
+        path.write_bytes(image_data)
+        self.connection.execute("INSERT OR REPLACE INTO annotation_screenshots VALUES (?, ?, ?, ?, ?)",
+                                (str(uuid4()), annotation_id, timeframe, str(path), _now()))
+        self.connection.commit()
+        return str(path)
+
+    def screenshots(self, annotation_id: str) -> list[dict[str, str]]:
+        return [dict(row) for row in self.connection.execute(
+            "SELECT timeframe, image_path, created_at FROM annotation_screenshots WHERE annotation_id = ? ORDER BY timeframe", (annotation_id,))]
+
+    def import_actual_trades(self, rows: list[dict[str, object]]) -> None:
+        self.connection.executemany(
+            "INSERT OR REPLACE INTO actual_manual_trades VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [(str(row["trade_id"]), str(row["symbol"]), int(row["entry_time"]), str(row["side"]),
+              float(row["entry_price"]), float(row["stop_loss"]), float(row["take_profit"]),
+              int(row["exit_time"]) if row.get("exit_time") else None, float(row["exit_price"]) if row.get("exit_price") else None,
+              str(row.get("notes") or "")) for row in rows],
+        ); self.connection.commit()
+
+    def actual_trades(self, symbol: str | None = None) -> list[dict[str, object]]:
+        query, args = "SELECT * FROM actual_manual_trades", ()
+        if symbol: query += " WHERE symbol = ?"; args = (symbol,)
+        return [dict(row) for row in self.connection.execute(query, args)]
+
+    def save_bot_review(self, review: BotCandidateReview) -> BotCandidateReview:
+        self.connection.execute("INSERT OR REPLACE INTO bot_candidate_reviews VALUES (?, ?, ?, ?, ?)",
+                                (review.review_id, review.annotation_id, json.dumps(review.candidate), review.verdict.value, review.created_at.isoformat()))
+        self.connection.commit(); return review
 
 
 def _session(row: sqlite3.Row) -> ReplaySession:

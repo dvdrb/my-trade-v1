@@ -121,6 +121,36 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS annotation_screenshots (
+                screenshot_id TEXT PRIMARY KEY,
+                annotation_id TEXT NOT NULL,
+                timeframe TEXT NOT NULL,
+                image_path TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_annotation_screenshots_annotation ON annotation_screenshots(annotation_id);
+
+            CREATE TABLE IF NOT EXISTS actual_manual_trades (
+                trade_id TEXT PRIMARY KEY,
+                symbol TEXT NOT NULL,
+                entry_time INTEGER NOT NULL,
+                side TEXT NOT NULL,
+                entry_price REAL NOT NULL,
+                stop_loss REAL NOT NULL,
+                take_profit REAL NOT NULL,
+                exit_time INTEGER,
+                exit_price REAL,
+                notes TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS bot_candidate_reviews (
+                review_id TEXT PRIMARY KEY,
+                annotation_id TEXT NOT NULL,
+                candidate_payload TEXT NOT NULL,
+                verdict TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
             """
         )
         _add_column(connection, "signals", "position_size", "REAL")
