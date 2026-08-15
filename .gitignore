@@ -35,6 +35,8 @@ data/research/manifests/
 *.sqlite-shm
 coverage.xml
 htmlcov/
+ui/annotator/node_modules/
+ui/annotator/dist/
 
 # Keep placeholder directories trackable
 !logs/.gitkeep

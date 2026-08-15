@@ -8,5 +8,7 @@ Requires-Dist: pydantic
 Requires-Dist: pydantic-settings
 Requires-Dist: python-dotenv
 Requires-Dist: pyyaml
+Requires-Dist: fastapi<1,>=0.115
+Requires-Dist: uvicorn<1,>=0.30
 Provides-Extra: dev
 Requires-Dist: pytest; extra == "dev"

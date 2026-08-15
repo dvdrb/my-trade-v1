@@ -67,6 +67,60 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
                 r_multiple REAL NOT NULL DEFAULT 0,
                 status TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS replay_sessions (
+                session_id TEXT PRIMARY KEY,
+                symbol TEXT NOT NULL,
+                started_at_market_time INTEGER NOT NULL,
+                replay_time INTEGER NOT NULL,
+                ended_at_market_time INTEGER,
+                status TEXT NOT NULL,
+                mode TEXT NOT NULL DEFAULT 'free_replay',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS human_annotations (
+                annotation_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                decision_time INTEGER NOT NULL,
+                schema_version TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(session_id) REFERENCES replay_sessions(session_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_human_annotations_session ON human_annotations(session_id);
+
+            CREATE TABLE IF NOT EXISTS annotation_revisions (
+                revision_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                annotation_id TEXT NOT NULL,
+                revision_number INTEGER NOT NULL,
+                payload TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(annotation_id, revision_number)
+            );
+
+            CREATE TABLE IF NOT EXISTS simulated_trades (
+                simulated_trade_id TEXT PRIMARY KEY,
+                annotation_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                side TEXT NOT NULL,
+                entry_price REAL NOT NULL,
+                stop_loss REAL NOT NULL,
+                take_profit REAL NOT NULL,
+                created_at_market_time INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                entry_time INTEGER,
+                exit_time INTEGER,
+                exit_price REAL,
+                realized_r REAL,
+                payload TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """
         )
         _add_column(connection, "signals", "position_size", "REAL")

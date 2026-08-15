@@ -9,6 +9,8 @@ dependencies = [
   "pydantic-settings",
   "python-dotenv",
   "pyyaml",
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.30,<1",
 ]
 
 [project.optional-dependencies]
