@@ -17,7 +17,7 @@ Start random replay
 → inspect 4H
 → inspect 1H
 → inspect 15M
-→ draw what matters
+→ draw triangles, trendlines, and strong points that matter
 → choose a decision
 → if Trade, place a plan
 → Record
@@ -26,11 +26,20 @@ Start random replay
 
 Random Replay is the normal Batch 1 mode. The backend chooses only timestamps inside the approved training interval from `app/config/research_periods.yaml`; validation and the final financial holdout cannot be entered. A replay also requires 200 closed 4H candles of pre-roll, and every chart request is bounded and future-safe.
 
-Each Record freezes one human decision and creates a clean, new draft. Do not use a previously recorded decision as a draft for a later market point. A saved decision is immutable; intentional corrections are revisions, with original payloads and screenshots retained.
+Each unrecorded draft is checkpointed locally for its active replay session, so a browser refresh restores its geometry. Each Record freezes one human decision and creates a clean, new draft. Do not use a previously recorded decision as a draft for a later market point. A saved decision is immutable; intentional corrections are revisions, with original payloads and screenshots retained.
 
 ## Drawing triangles
 
 `TRIANGLE` (or `T`) is one three-click action: click each visual vertex, then the chart closes the triangle. The three timestamp/price vertices are the canonical human record, remain individually draggable, and are restored exactly when switching timeframes or reopening the workstation. New triangles use the automatic role for their chart: 4H macro parent, 1H local parent, and 15M entry.
+
+## Drawing trendlines and strong points
+
+`TRENDLINE` (or `L`) is a two-click line. Both endpoints keep click order and
+may project into the chart's blank right side; that projection is human geometry,
+not future market data. `STRONG POINT` (or `O`) is a one-click, draggable marker
+for an observed important point. It never implies support, resistance, high, or
+low, and it cannot be placed on an unrevealed future candle. Both remain scoped
+to their selected timeframe and appear in the automatic screenshots.
 
 ## Decision definitions
 
@@ -46,7 +55,7 @@ For Trade, choose Long or Short and place Entry, Stop, and Target. Long requires
 ```text
 Right Arrow       next candle
 Shift + Right     +5 candles
-T / H / Z         triangle / level / zone
+T / L / O         triangle / trendline / strong point
 E / S / P         entry / stop / target
 1–5               confidence
 Cmd/Ctrl+Z        undo

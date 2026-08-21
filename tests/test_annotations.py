@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.annotation.models import HumanAnnotation, HumanSide, LegacyTriangleGeometry, MarketState, PricePoint, ReplaySession, SimulatedTrade, Structure, StructureRole, TrendLine, TriangleGeometry
+from app.annotation.models import HumanAnnotation, HumanSide, HumanTrendline, LegacyTriangleGeometry, MarketState, PricePoint, ReplaySession, SimulatedTrade, StrongPoint, Structure, StructureRole, TrendLine, TriangleGeometry
 from app.annotation.replay import step_trade, visible_candles
 from app.annotation.repository import AnnotationRepository
 from app.annotation.research_range import human_research_bounds
@@ -66,6 +66,21 @@ def test_canonical_human_research_bounds_are_training_only() -> None:
 
 def test_human_ground_truth_export_defaults_to_the_replay_database() -> None:
     assert DEFAULT_HUMAN_REPLAY_DB == "data/human_replay.sqlite3"
+
+
+def test_v1_and_v2_annotations_remain_read_compatible() -> None:
+    for schema_version in ("human-ground-truth-v1", "human-ground-truth-v2"):
+        annotation = HumanAnnotation.model_validate({
+            "schema_version": schema_version,
+            "session_id": "old-session",
+            "symbol": "BTC",
+            "decision_time": 3,
+            "market_state": "valid_triangle_no_trade",
+            "structures": [structure(3).model_dump(mode="json")],
+        })
+        assert annotation.schema_version == schema_version
+        assert annotation.trendlines == []
+        assert annotation.strong_points == []
 
 
 def test_replay_range_enforces_preroll_training_boundary_and_random_selection(tmp_path: Path) -> None:
@@ -144,6 +159,30 @@ def test_projected_triangle_vertex_is_saved_without_exposing_future_candles(tmp_
     assert max(item["open_time"] for item in candles) <= session["replay_time"]
 
 
+def test_v3_trendlines_and_strong_points_round_trip_with_projection_rules(tmp_path: Path) -> None:
+    client, db = seeded_client(tmp_path); session = create_session(client)
+    time = int(session["replay_time"])
+    payload = annotation_payload(session)
+    payload["trendlines"] = [{"trendline_id": "line", "timeframe": "15m", "p1": {"timestamp": time - 1_000, "price": 99}, "p2": {"timestamp": time + 3_000, "price": 101}, "snap_mode": "weak"}]
+    payload["strong_points"] = [{"strong_point_id": "point", "timeframe": "1h", "point": {"timestamp": time, "price": 100}, "snap_mode": "strong"}]
+    saved = client.post("/api/annotations", json=payload)
+    assert saved.status_code == 200, saved.text
+    annotation = AnnotationRepository(connect(db)).annotations()[0]
+    assert annotation.schema_version == "human-ground-truth-v3"
+    assert annotation.trendlines[0].p2.timestamp == time + 3_000
+    assert annotation.strong_points[0].point.price == 100
+    payload["annotation_id"] = "future-point"
+    payload["strong_points"][0]["point"]["timestamp"] = time + 1
+    assert client.post("/api/annotations", json=payload).status_code == 422
+
+
+def test_v3_human_drawing_models_reject_invalid_geometry() -> None:
+    point = PricePoint(timestamp=1, price=100)
+    with pytest.raises(ValueError):
+        HumanTrendline(timeframe="15m", p1=point, p2=point)
+    assert StrongPoint(timeframe="4h", point=point, snap_mode="free").point == point
+
+
 def test_record_failure_does_not_create_trade_and_screenshot_revisions_are_retained(tmp_path: Path) -> None:
     client, db = seeded_client(tmp_path); session = create_session(client)
     payload = annotation_payload(session, MarketState.TRADE)
@@ -169,12 +208,15 @@ def test_ambiguous_ohlc_is_not_silently_recorded_as_a_loss() -> None:
 def test_export_and_verify_batch_preserves_unique_annotations(tmp_path: Path) -> None:
     db = tmp_path / "export.sqlite3"; init_db(db); repository = AnnotationRepository(connect(db))
     session = repository.create_session(ReplaySession(symbol="BTC", started_at_market_time=2, replay_time=2))
-    annotation = repository.save_annotation(HumanAnnotation(session_id=session.session_id, symbol="BTC", decision_time=2, market_state=MarketState.TRADE, side=HumanSide.LONG, structures=[structure()], trade_plan={"entry_price": 100, "stop_loss": 95, "take_profit": 110}))
+    annotation = repository.save_annotation(HumanAnnotation(session_id=session.session_id, symbol="BTC", decision_time=2, market_state=MarketState.TRADE, side=HumanSide.LONG, structures=[structure()], trendlines=[HumanTrendline(trendline_id="line", timeframe="15m", p1=PricePoint(timestamp=1, price=99), p2=PricePoint(timestamp=3, price=101))], strong_points=[StrongPoint(strong_point_id="point", timeframe="1h", point=PricePoint(timestamp=2, price=100))], trade_plan={"entry_price": 100, "stop_loss": 95, "take_profit": 110}))
     repository.save_screenshots(annotation.annotation_id, {"4h": b"png", "1h": b"png", "15m": b"png"}, tmp_path / "screenshots")
     output = tmp_path / "batches"
     root = Path(__file__).parents[1]
     subprocess.run([sys.executable, "scripts/export_human_ground_truth.py", "--db", str(db), "--output", str(output), "--batch", "batch_001"], cwd=root, check=True)
     subprocess.run([sys.executable, "scripts/verify_human_ground_truth_batch.py", str(output / "batch_001")], cwd=root, check=True)
+    exported = HumanAnnotation.model_validate_json((output / "batch_001" / "annotations.jsonl").read_text())
+    assert exported.trendlines[0].trendline_id == "line"
+    assert exported.strong_points[0].strong_point_id == "point"
     (output / "batch_001" / "screenshots" / annotation.annotation_id / "revision_001" / "1h.png").unlink()
     verify = subprocess.run([sys.executable, "scripts/verify_human_ground_truth_batch.py", str(output / "batch_001")], cwd=root, text=True, capture_output=True)
     assert verify.returncode != 0

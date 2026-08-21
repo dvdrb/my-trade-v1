@@ -35,6 +35,22 @@ def verify(batch: Path) -> list[str]:
     for annotation in annotations:
         if annotation.decision_time < 0:
             errors.append("annotation has an invalid decision timestamp")
+        trendline_ids = [trendline.trendline_id for trendline in annotation.trendlines]
+        if len(trendline_ids) != len(set(trendline_ids)):
+            errors.append(f"annotation {annotation.annotation_id} has duplicate trendline IDs")
+        strong_point_ids = [point.strong_point_id for point in annotation.strong_points]
+        if len(strong_point_ids) != len(set(strong_point_ids)):
+            errors.append(f"annotation {annotation.annotation_id} has duplicate strong-point IDs")
+        for trendline in annotation.trendlines:
+            if trendline.p1 == trendline.p2:
+                errors.append(f"trendline {trendline.trendline_id} has identical endpoints")
+            if trendline.p1.timestamp < 0 or trendline.p2.timestamp < 0 or trendline.p1.price <= 0 or trendline.p2.price <= 0:
+                errors.append(f"trendline {trendline.trendline_id} has invalid coordinates")
+        for strong_point in annotation.strong_points:
+            if strong_point.point.timestamp < 0 or strong_point.point.price <= 0:
+                errors.append(f"strong point {strong_point.strong_point_id} has invalid coordinates")
+            if strong_point.point.timestamp > annotation.decision_time:
+                errors.append(f"strong point {strong_point.strong_point_id} is a future market observation")
         revision = int(canonical_revisions.get(annotation.annotation_id, 1))
         screenshot_directory = batch / "screenshots" / annotation.annotation_id / f"revision_{revision:03d}"
         actual_timeframes = {path.stem for path in screenshot_directory.glob("*.png")}

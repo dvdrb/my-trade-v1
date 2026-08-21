@@ -8,8 +8,8 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, model_validator
 
 
-SCHEMA_VERSION = "human-ground-truth-v2"
-SUPPORTED_SCHEMA_VERSIONS = {"human-ground-truth-v1", SCHEMA_VERSION}
+SCHEMA_VERSION = "human-ground-truth-v3"
+SUPPORTED_SCHEMA_VERSIONS = {"human-ground-truth-v1", "human-ground-truth-v2", SCHEMA_VERSION}
 
 
 def utc_now() -> datetime:
@@ -99,6 +99,35 @@ class PriceLevel(BaseModel):
         return self
 
 
+class HumanTrendline(BaseModel):
+    """A two-click line as the trader actually drew it, in click order."""
+
+    trendline_id: str = Field(default_factory=lambda: str(uuid4()))
+    timeframe: Literal["15m", "1h", "4h"]
+    p1: PricePoint
+    p2: PricePoint
+    snap_mode: Literal["free", "weak", "strong"] = "free"
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    @model_validator(mode="after")
+    def requires_distinct_endpoints(self) -> "HumanTrendline":
+        if self.p1 == self.p2:
+            raise ValueError("trendline endpoints must be distinct")
+        return self
+
+
+class StrongPoint(BaseModel):
+    """An explicitly important observed market point, with no inferred label."""
+
+    strong_point_id: str = Field(default_factory=lambda: str(uuid4()))
+    timeframe: Literal["15m", "1h", "4h"]
+    point: PricePoint
+    snap_mode: Literal["free", "weak", "strong"] = "free"
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class TradePlan(BaseModel):
     entry_price: float = Field(gt=0)
     stop_loss: float = Field(gt=0)
@@ -129,6 +158,8 @@ class HumanAnnotation(BaseModel):
     side: HumanSide | None = None
     confidence: int | None = Field(default=None, ge=1, le=5)
     structures: list[Structure] = Field(default_factory=list)
+    trendlines: list[HumanTrendline] = Field(default_factory=list)
+    strong_points: list[StrongPoint] = Field(default_factory=list)
     levels: list[PriceLevel] = Field(default_factory=list)
     trade_plan: TradePlan | None = None
     notes: str | None = None

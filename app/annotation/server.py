@@ -79,6 +79,11 @@ def create_app(db_path: str | Path = "data/bot.sqlite3", *, research_periods_pat
             for point in geometry_points(structure.geometry):
                 if point.timestamp > session.replay_time:
                     raise HTTPException(422, "structure point is in the future")
+        # Human trendlines may project into the blank part of the chart. They are
+        # trader-created geometry, not future market observations.
+        for strong_point in annotation.strong_points:
+            if strong_point.point.timestamp > session.replay_time:
+                raise HTTPException(422, "strong point is in the future")
         for level in annotation.levels:
             for point in (level.start, level.end):
                 if point is not None and point.timestamp > session.replay_time:

@@ -16,6 +16,19 @@ export type Triangle = {
   role: string;
   geometry: TriangleGeometry | LegacyTriangleGeometry;
 };
+export type HumanTrendline = {
+  trendline_id: string;
+  timeframe: Timeframe;
+  p1: Point;
+  p2: Point;
+  snap_mode: "free" | "weak" | "strong";
+};
+export type StrongPoint = {
+  strong_point_id: string;
+  timeframe: Timeframe;
+  point: Point;
+  snap_mode: "free" | "weak" | "strong";
+};
 export type PriceLevel = {
   level_id: string;
   timeframe: Timeframe;
@@ -41,6 +54,8 @@ export type Annotation = {
   side?: "long" | "short" | null;
   confidence?: number | null;
   structures: Triangle[];
+  trendlines: HumanTrendline[];
+  strong_points: StrongPoint[];
   levels: PriceLevel[];
   trade_plan?: TradePlan | null;
   notes?: string | null;

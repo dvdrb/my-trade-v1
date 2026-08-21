@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { noFuturePoint, toTimestamp, triangleVerticesAreReplaySafe, type Annotation } from './types';
-import { createTriangle, forTimeframe, updateLevelCoordinates, updateTriangleVertices, withMarketState } from './draft';
+import { createStrongPoint, createTrendline, createTriangle, forTimeframe, updateLevelCoordinates, updateStrongPoint, updateTrendline, updateTriangleVertices, withMarketState } from './draft';
 import { canonicalTrianglePoint, createTriangleTimeAxis, dataIndexForTimestamp, hasThreeTriangleCoordinates, overlayPointForTriangle, timestampForDataIndex } from './charts/triangleProjection';
 
 describe('chart annotation domain boundaries', () => {
@@ -58,23 +58,34 @@ describe('chart annotation domain boundaries', () => {
     expect(overlayPointForTriangle(timeAxis, { timestamp: 7_000, price: 101 })).toEqual({ dataIndex: 6, value: 101 });
   });
 
+  it('creates and edits one trendline and one strong point without changing their semantic type', () => {
+    const line = createTrendline('line', '1h', { timestamp: 1, price: 10 }, { timestamp: 5, price: 12 }, 'strong');
+    const point = createStrongPoint('point', '15m', { timestamp: 3, price: 11 }, 'weak');
+    expect([line]).toHaveLength(1);
+    expect([point]).toHaveLength(1);
+    expect(updateTrendline([line], 'line', { timestamp: 2, price: 10.5 }, line.p2)[0]).toMatchObject({ trendline_id: 'line', p1: { timestamp: 2, price: 10.5 } });
+    expect(updateStrongPoint([point], 'point', { timestamp: 4, price: 11.5 })[0]).toMatchObject({ strong_point_id: 'point', point: { timestamp: 4, price: 11.5 } });
+  });
+
   it('isolates structures and levels to their chart timeframe', () => {
     const geometry = { vertices: [{ timestamp: 1, price: 2 }, { timestamp: 1, price: 1 }, { timestamp: 2, price: 1.5 }] as [{ timestamp: number, price: number }, { timestamp: number, price: number }, { timestamp: number, price: number }], snap_mode: 'free' as const };
     const annotation: Annotation = { annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 1, market_state: 'maybe_setup', side: 'long', structures: [
       { structure_id: '4', timeframe: '4h', role: 'macro_parent', geometry },
       { structure_id: '15', timeframe: '15m', role: 'entry', geometry },
-    ], levels: [{ level_id: '1', timeframe: '1h', kind: 'support', start: { timestamp: 1, price: 1 } }] };
+    ], trendlines: [createTrendline('line', '1h', { timestamp: 1, price: 1 }, { timestamp: 2, price: 2 }, 'free')], strong_points: [createStrongPoint('point', '15m', { timestamp: 1, price: 1 }, 'weak')], levels: [{ level_id: '1', timeframe: '1h', kind: 'support', start: { timestamp: 1, price: 1 } }] };
     expect(forTimeframe(annotation, '4h').structures.map((item) => item.structure_id)).toEqual(['4']);
     expect(forTimeframe(annotation, '4h').levels).toEqual([]);
+    expect(forTimeframe(annotation, '4h').trendlines).toEqual([]);
+    expect(forTimeframe(annotation, '15m').strong_points).toHaveLength(1);
   });
 
   it('clears stale direction and plan when recording Nothing Here', () => {
-    const annotation: Annotation = { annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 1, market_state: 'trade', side: 'long', structures: [], levels: [], trade_plan: { entry_price: 100, stop_loss: 95, take_profit: 110 } };
+    const annotation: Annotation = { annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 1, market_state: 'trade', side: 'long', structures: [], trendlines: [], strong_points: [], levels: [], trade_plan: { entry_price: 100, stop_loss: 95, take_profit: 110 } };
     expect(withMarketState(annotation, 'no_structure')).toMatchObject({ side: null, trade_plan: null });
   });
 
   it('round-trips both strong-zone corners after a drag or resize', () => {
-    const annotation: Annotation = { annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 1, market_state: 'maybe_setup', side: null, structures: [], levels: [{ level_id: 'zone', timeframe: '1h', kind: 'strong_zone', start: { timestamp: 10, price: 100 }, end: { timestamp: 20, price: 90 } }] };
+    const annotation: Annotation = { annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 1, market_state: 'maybe_setup', side: null, structures: [], trendlines: [], strong_points: [], levels: [{ level_id: 'zone', timeframe: '1h', kind: 'strong_zone', start: { timestamp: 10, price: 100 }, end: { timestamp: 20, price: 90 } }] };
     const start = { timestamp: 12, price: 105 }, end = { timestamp: 27, price: 88 };
     const saved = { ...annotation, levels: updateLevelCoordinates(annotation.levels, 'zone', start, end) };
     const reloaded = JSON.parse(JSON.stringify(saved)) as Annotation;

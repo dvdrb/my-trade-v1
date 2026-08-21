@@ -12,6 +12,8 @@ import type {
   OverlayLine,
   Point,
   PriceLevel,
+  HumanTrendline,
+  StrongPoint,
   TradePlan,
   Triangle,
 } from "../types";
@@ -40,11 +42,12 @@ const toPoint = (
     : null;
 const toLine = (event: OverlayEvent): OverlayLine | null => {
   const points = event.overlay.points
-    .map(toPoint)
+    .map((point) => toPoint(point))
     .filter((point): point is Point => point !== null);
   return points.length === 2 ? { p1: points[0], p2: points[1] } : null;
 };
 const humanTriangleOverlay = "humanTriangle";
+const humanStrongPointOverlay = "humanStrongPoint";
 const traceTriangle = (stage: string, value: unknown) =>
   new URLSearchParams(window.location.search).has("triangleTrace") &&
   console.debug(`[humanTriangle] ${stage} ${JSON.stringify(value)}`);
@@ -72,6 +75,21 @@ registerOverlay({
       }]
       : [];
   },
+});
+
+registerOverlay({
+  name: humanStrongPointOverlay,
+  // KLineChart completes one-click overlays when totalStep is two.
+  totalStep: 2,
+  needDefaultPointFigure: true,
+  createPointFigures: ({ coordinates }) => coordinates.length === 1
+    ? [{
+      type: "circle",
+      attrs: { x: coordinates[0].x, y: coordinates[0].y, r: 5 },
+      styles: { style: PolygonType.StrokeFill, color: "rgba(241, 197, 114, 0.3)", borderColor: "#f1c572", borderSize: 2 },
+      ignoreEvent: true,
+    }]
+    : [],
 });
 
 // This module is the KLineChart boundary. Nothing outside it stores overlay IDs or pixels.
@@ -147,15 +165,47 @@ export class KLineChartAdapter {
     });
     this.saveOverlay("draft-triangle", id);
   }
-  private triangleVertices(event: OverlayEvent): [Point, Point, Point] | null {
+  drawTrendline(snap: SnapMode, complete: (p1: Point, p2: Point) => void) {
+    const id = this.chart.createOverlay({
+      name: "straightLine",
+      groupId: "draft-trendline",
+      mode: mode(snap),
+      onDrawEnd: (event) => {
+        const points = this.marketPoints(event, 2);
+        if (points) complete(points[0], points[1]);
+        return Boolean(points);
+      },
+    });
+    this.saveOverlay("draft-trendline", id);
+  }
+  drawStrongPoint(snap: SnapMode, complete: (point: Point) => void) {
+    const id = this.chart.createOverlay({
+      name: humanStrongPointOverlay,
+      groupId: "draft-strong-point",
+      mode: mode(snap),
+      onDrawEnd: (event) => {
+        const points = this.marketPoints(event, 1, false);
+        if (points) complete(points[0]);
+        return Boolean(points);
+      },
+    });
+    this.saveOverlay("draft-strong-point", id);
+  }
+  private marketPoints(event: OverlayEvent, count: number, projected = true): Point[] | null {
     const axis = this.triangleTimeAxis;
     if (!axis) return null;
-    traceTriangle("before canonical conversion", event.overlay.points);
-    const vertices = event.overlay.points
+    const points = event.overlay.points
       .map((point) => canonicalTrianglePoint(point, axis))
       .filter((point): point is Point => point !== null);
+    if (points.length !== count || (!projected && points.some((point) => point.timestamp > axis.lastTimestamp))) return null;
+    return points;
+  }
+  private triangleVertices(event: OverlayEvent): [Point, Point, Point] | null {
+    traceTriangle("before canonical conversion", event.overlay.points);
+    const vertices = this.marketPoints(event, 3);
+    if (!vertices) return null;
     const [first, second, third] = vertices;
-    if (!first || !second || !third || vertices.length !== 3) return null;
+    if (!first || !second || !third) return null;
     traceTriangle("canonical stored geometry", vertices);
     return [first, second, third];
   }
@@ -181,10 +231,14 @@ export class KLineChartAdapter {
   }
   restore(
     structures: Triangle[],
+    trendlines: HumanTrendline[],
+    strongPoints: StrongPoint[],
     levels: PriceLevel[],
     plan: TradePlan | null,
     side: "long" | "short" | null,
     onTriangleEdit: (id: string, vertices: [Point, Point, Point]) => void,
+    onTrendlineEdit: (id: string, p1: Point, p2: Point) => void,
+    onStrongPointEdit: (id: string, point: Point) => void,
     onStructureEdit: (
       id: string,
       line: "upper" | "lower",
@@ -246,6 +300,35 @@ export class KLineChartAdapter {
         });
         this.saveOverlay(`${structure.structure_id}-${which}`, id);
       });
+    }
+    for (const trendline of trendlines) {
+      const axis = this.triangleTimeAxis;
+      if (!axis) continue;
+      const id = this.chart.createOverlay({
+        name: "straightLine", groupId: trendline.trendline_id, lock: false, mode: mode(trendline.snap_mode),
+        points: [overlayPointForTriangle(axis, trendline.p1), overlayPointForTriangle(axis, trendline.p2)],
+        styles: { line: { color: "#f1c572", size: 2 } },
+        onPressedMoveEnd: (event) => {
+          const points = this.marketPoints(event, 2);
+          if (points) onTrendlineEdit(trendline.trendline_id, points[0], points[1]);
+          return true;
+        },
+      });
+      this.saveOverlay(trendline.trendline_id, id);
+    }
+    for (const strongPoint of strongPoints) {
+      const axis = this.triangleTimeAxis;
+      if (!axis) continue;
+      const id = this.chart.createOverlay({
+        name: humanStrongPointOverlay, groupId: strongPoint.strong_point_id, lock: false, mode: mode(strongPoint.snap_mode),
+        points: [overlayPointForTriangle(axis, strongPoint.point)],
+        onPressedMoveEnd: (event) => {
+          const points = this.marketPoints(event, 1, false);
+          if (points) onStrongPointEdit(strongPoint.strong_point_id, points[0]);
+          return true;
+        },
+      });
+      this.saveOverlay(strongPoint.strong_point_id, id);
     }
     for (const level of levels) {
       const id = this.chart.createOverlay({

@@ -169,6 +169,19 @@ Paper mode does not place real orders.
 python -m pytest
 ```
 
+## Human Ground Truth Workstation
+
+Start the blind historical workstation with one command:
+
+```bash
+python scripts/strategy_annotator.py
+```
+
+On 4H, 1H, and 15M, capture only the trader's actual analysis: triangles,
+trendlines, and strong points. Then choose Nothing, Skip, Maybe, or Trade; a
+Trade additionally records direction, entry, stop, target, confidence, and
+optional notes. `Record` saves the decision and all three timeframe screenshots.
+
 ## Safety Notes
 
 - Real order execution is not implemented.
