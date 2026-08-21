@@ -13,13 +13,16 @@ from app.annotation.models import SCHEMA_VERSION
 from app.data.db import connect, init_db
 
 
+DEFAULT_HUMAN_REPLAY_DB = "data/human_replay.sqlite3"
+
+
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Export an immutable human-ground-truth batch.")
-    parser.add_argument("--db", default="data/bot.sqlite3"); parser.add_argument("--output", default="data/human_ground_truth/batches")
+    parser.add_argument("--db", default=DEFAULT_HUMAN_REPLAY_DB); parser.add_argument("--output", default="data/human_ground_truth/batches")
     parser.add_argument("--batch", default=None); args = parser.parse_args()
     init_db(args.db); repository = AnnotationRepository(connect(args.db))
     annotations, trades = repository.annotations(), repository.trades()

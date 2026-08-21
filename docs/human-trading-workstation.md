@@ -5,11 +5,10 @@ The workstation is a local, blind historical replay instrument for collecting hu
 ## Start
 
 ```bash
-python scripts/prepare_human_replay_data.py
 python scripts/strategy_annotator.py
 ```
 
-The one-time preparation step copies only the approved train/validation candles from the local checksum-verified research database into `data/human_replay.sqlite3`; it never copies final-holdout data and never changes `data/bot.sqlite3`. The launcher rebuilds the local UI by default so it cannot serve stale source. Use `--skip-ui-build` only when deliberately reusing an existing build.
+This is the normal one-command startup. If `data/human_replay.sqlite3` is absent, the launcher safely creates it from the local checksum-verified research source; it never overwrites an existing replay database. The replay database contains only the training interval (`train.start` through, but excluding, `train.end`) from `app/config/research_periods.yaml`. It never copies validation or final-holdout candles and never changes `data/bot.sqlite3`. The launcher rebuilds the local UI by default so it cannot serve stale source. Use `--skip-ui-build` only when deliberately reusing an existing build.
 
 ## Normal workflow
 
@@ -25,7 +24,7 @@ Start random replay
 → continue
 ```
 
-Random Replay is the normal Batch 1 mode. The backend chooses only timestamps inside the approved train/validation research interval from `app/config/research_periods.yaml`; the final financial holdout cannot be entered. A replay also requires 200 closed 4H candles of pre-roll, and every chart request is bounded and future-safe.
+Random Replay is the normal Batch 1 mode. The backend chooses only timestamps inside the approved training interval from `app/config/research_periods.yaml`; validation and the final financial holdout cannot be entered. A replay also requires 200 closed 4H candles of pre-roll, and every chart request is bounded and future-safe.
 
 Each Record freezes one human decision and creates a clean, new draft. Do not use a previously recorded decision as a draft for a later market point. A saved decision is immutable; intentional corrections are revisions, with original payloads and screenshots retained.
 
@@ -64,11 +63,11 @@ python scripts/export_human_ground_truth.py
 python scripts/verify_human_ground_truth_batch.py data/human_ground_truth/batches/batch_001
 ```
 
-Exports are immutable: an existing batch is never overwritten. The manifest includes range, counts, symbols, screenshots, canonical screenshot revisions, and source commit where available. Verification checks JSONL schemas, checksums, unique annotation IDs, trade references, and screenshot presence.
+Exports are immutable: an existing batch is never overwritten. The default source is `data/human_replay.sqlite3`. The manifest includes range, counts, symbols, screenshots, canonical screenshot revisions, and source commit where available. Verification checks JSONL schemas, checksums, unique annotation IDs, trade references, and exactly one canonical screenshot for each of `4h`, `1h`, and `15m`.
 
 ## Important research rules
 
 - Do not redraw because a trade lost.
 - Do not inspect future candles.
 - Do not use Bot Review for primary Batch 1 collection.
-- Do not access the final financial holdout.
+- Do not access validation or the final financial holdout.

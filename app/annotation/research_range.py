@@ -28,10 +28,10 @@ def _timestamp(value: str) -> int:
 
 
 def human_research_bounds(path: str | Path = "app/config/research_periods.yaml") -> tuple[int, int]:
-    """Return [start, final-holdout-start), from the canonical research split."""
+    """Return the training-only interval [train.start, train.end)."""
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     periods = data["periods"]
-    return _timestamp(str(periods["train"]["start"])), _timestamp(str(periods["final_holdout"]["start"]))
+    return _timestamp(str(periods["train"]["start"])), _timestamp(str(periods["train"]["end"]))
 
 
 def allowed_replay_range(

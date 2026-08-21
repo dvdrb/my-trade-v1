@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { noFuturePoint, toTimestamp, type Annotation } from './types';
-import { forTimeframe, withMarketState } from './draft';
+import { forTimeframe, updateLevelCoordinates, withMarketState } from './draft';
 
 describe('chart annotation domain boundaries', () => {
   it('normalizes seconds to timestamp milliseconds', () => {
@@ -25,5 +25,13 @@ describe('chart annotation domain boundaries', () => {
   it('clears stale direction and plan when recording Nothing Here', () => {
     const annotation: Annotation = { annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 1, market_state: 'trade', side: 'long', structures: [], levels: [], trade_plan: { entry_price: 100, stop_loss: 95, take_profit: 110 } };
     expect(withMarketState(annotation, 'no_structure')).toMatchObject({ side: null, trade_plan: null });
+  });
+
+  it('round-trips both strong-zone corners after a drag or resize', () => {
+    const annotation: Annotation = { annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 1, market_state: 'maybe_setup', side: null, structures: [], levels: [{ level_id: 'zone', timeframe: '1h', kind: 'strong_zone', start: { timestamp: 10, price: 100 }, end: { timestamp: 20, price: 90 } }] };
+    const start = { timestamp: 12, price: 105 }, end = { timestamp: 27, price: 88 };
+    const saved = { ...annotation, levels: updateLevelCoordinates(annotation.levels, 'zone', start, end) };
+    const reloaded = JSON.parse(JSON.stringify(saved)) as Annotation;
+    expect(forTimeframe(reloaded, '1h').levels[0]).toMatchObject({ start, end });
   });
 });

@@ -10,10 +10,12 @@ from fastapi.testclient import TestClient
 from app.annotation.models import HumanAnnotation, HumanSide, MarketState, PricePoint, ReplaySession, SimulatedTrade, Structure, StructureRole, TrendLine, TriangleGeometry
 from app.annotation.replay import step_trade, visible_candles
 from app.annotation.repository import AnnotationRepository
+from app.annotation.research_range import human_research_bounds
 from app.annotation.server import create_app
 from app.core.types import Candle
 from app.data.db import connect, init_db
 from app.data.repositories import CandleRepository
+from scripts.export_human_ground_truth import DEFAULT_HUMAN_REPLAY_DB
 
 
 def candle(time: int, low: float = 90, high: float = 110) -> Candle:
@@ -54,7 +56,17 @@ def test_visible_candles_never_leak_incomplete_higher_timeframes() -> None:
     assert visible_candles([incomplete], 4) == [incomplete]
 
 
-def test_replay_range_enforces_preroll_holdout_and_random_selection(tmp_path: Path) -> None:
+def test_canonical_human_research_bounds_are_training_only() -> None:
+    start, end = human_research_bounds()
+    assert start == 1_735_689_600_000  # 2025-01-01T00:00:00Z
+    assert end == 1_766_361_600_000  # 2025-12-22T00:00:00Z, validation.start
+
+
+def test_human_ground_truth_export_defaults_to_the_replay_database() -> None:
+    assert DEFAULT_HUMAN_REPLAY_DB == "data/human_replay.sqlite3"
+
+
+def test_replay_range_enforces_preroll_training_boundary_and_random_selection(tmp_path: Path) -> None:
     client, _ = seeded_client(tmp_path)
     replay_range = client.get("/api/replay-range/BTC").json()
     assert replay_range["earliest_valid"] >= 199 * 4_000
@@ -133,3 +145,7 @@ def test_export_and_verify_batch_preserves_unique_annotations(tmp_path: Path) ->
     root = Path(__file__).parents[1]
     subprocess.run([sys.executable, "scripts/export_human_ground_truth.py", "--db", str(db), "--output", str(output), "--batch", "batch_001"], cwd=root, check=True)
     subprocess.run([sys.executable, "scripts/verify_human_ground_truth_batch.py", str(output / "batch_001")], cwd=root, check=True)
+    (output / "batch_001" / "screenshots" / annotation.annotation_id / "revision_001" / "1h.png").unlink()
+    verify = subprocess.run([sys.executable, "scripts/verify_human_ground_truth_batch.py", str(output / "batch_001")], cwd=root, text=True, capture_output=True)
+    assert verify.returncode != 0
+    assert "canonical screenshots must be exactly" in verify.stderr

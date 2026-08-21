@@ -117,7 +117,7 @@ export class KLineChartAdapter {
       line: "upper" | "lower",
       value: OverlayLine,
     ) => void,
-    onLevelEdit: (id: string, point: Point) => void,
+    onLevelEdit: (id: string, start: Point, end?: Point) => void,
     onPlanEdit: (
       key: "entry_price" | "stop_loss" | "take_profit",
       price: number,
@@ -167,8 +167,11 @@ export class KLineChartAdapter {
           ? { rect: { style: PolygonType.Fill, color: "rgba(141, 180, 230, 0.16)", borderColor: "#8db4e6", borderSize: 1 } }
           : { line: { color: "#8db4e6", size: 1 } },
         onPressedMoveEnd: (event) => {
-          const p = toPoint(event.overlay.points[0], this.lastTimestamp);
-          if (p) onLevelEdit(level.level_id, p);
+          const start = toPoint(event.overlay.points[0], this.lastTimestamp);
+          const end = level.kind === "strong_zone"
+            ? toPoint(event.overlay.points[1], this.lastTimestamp) ?? undefined
+            : undefined;
+          if (start && (level.kind !== "strong_zone" || end)) onLevelEdit(level.level_id, start, end);
           return true;
         },
       });

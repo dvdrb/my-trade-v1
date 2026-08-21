@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { KLineChartAdapter } from "./charts/KLineChartAdapter";
-import { forTimeframe, withMarketState } from "./draft";
+import { forTimeframe, updateLevelCoordinates, withMarketState } from "./draft";
 import type { Annotation, OverlayLine, PriceLevel, Timeframe, TradePlan, Triangle } from "./types";
 import "./style.css";
 
@@ -55,7 +55,7 @@ function App() {
     const visible = forTimeframe(draft, tf);
     chart.current.restore(visible.structures, visible.levels, visible.trade_plan ?? null, visible.side ?? null,
       (id, side, line) => editable && change((item) => ({ ...item, structures: updateLine(item.structures, id, side, line) })),
-      (id, point) => editable && change((item) => ({ ...item, levels: item.levels.map((level) => level.level_id === id ? { ...level, start: point } : level) })),
+      (id, start, end) => editable && change((item) => ({ ...item, levels: updateLevelCoordinates(item.levels, id, start, end) })),
       (key, price) => editable && change((item) => ({ ...item, trade_plan: item.trade_plan ? { ...item.trade_plan, [key]: price } : item.trade_plan })),
     );
   };

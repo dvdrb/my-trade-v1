@@ -30,12 +30,19 @@ def verify(batch: Path) -> list[str]:
         errors.append("a simulated trade references an unknown annotation")
     if manifest.get("annotation_count") != len(annotations) or manifest.get("trade_count") != len(trades):
         errors.append("manifest counts do not match exported records")
+    required_timeframes = {"4h", "1h", "15m"}
+    canonical_revisions = manifest.get("canonical_annotation_revisions", {})
     for annotation in annotations:
         if annotation.decision_time < 0:
             errors.append("annotation has an invalid decision timestamp")
-        screenshots = list((batch / "screenshots" / annotation.annotation_id).rglob("*.png"))
-        if not screenshots:
-            errors.append(f"annotation {annotation.annotation_id} is missing screenshots")
+        revision = int(canonical_revisions.get(annotation.annotation_id, 1))
+        screenshot_directory = batch / "screenshots" / annotation.annotation_id / f"revision_{revision:03d}"
+        actual_timeframes = {path.stem for path in screenshot_directory.glob("*.png")}
+        if actual_timeframes != required_timeframes:
+            errors.append(
+                f"annotation {annotation.annotation_id} canonical screenshots must be exactly "
+                f"{sorted(required_timeframes)}, found {sorted(actual_timeframes)}"
+            )
     for line in sums_path.read_text(encoding="utf-8").splitlines():
         expected, relative = line.split("  ", 1)
         path = batch / relative

@@ -2,17 +2,18 @@
   "source": "data/research.sqlite3",
   "target": "data/human_replay.sqlite3",
   "research_start": 1735689600000,
-  "research_end_exclusive": 1776556800000,
-  "holdout_candles_copied": 0,
+  "research_end_exclusive": 1766361600000,
+  "validation_candles_copied": 0,
+  "final_holdout_candles_copied": 0,
   "counts": {
-    "BTC:15m": 45407,
-    "BTC:1h": 11351,
-    "BTC:4h": 2837,
-    "ETH:15m": 45407,
-    "ETH:1h": 11351,
-    "ETH:4h": 2837,
-    "SOL:15m": 45407,
-    "SOL:1h": 11351,
-    "SOL:4h": 2837
+    "BTC:15m": 34079,
+    "BTC:1h": 8519,
+    "BTC:4h": 2129,
+    "ETH:15m": 34079,
+    "ETH:1h": 8519,
+    "ETH:4h": 2129,
+    "SOL:15m": 34079,
+    "SOL:1h": 8519,
+    "SOL:4h": 2129
   }
 }
