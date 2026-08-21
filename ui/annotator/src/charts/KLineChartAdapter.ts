@@ -2,6 +2,7 @@ import {
   dispose,
   init,
   OverlayMode,
+  PolygonType,
   type Chart,
   type KLineData,
   type OverlayEvent,
@@ -39,9 +40,11 @@ const toLine = (event: OverlayEvent): OverlayLine | null => {
 // This module is the KLineChart boundary. Nothing outside it stores overlay IDs or pixels.
 export class KLineChartAdapter {
   private chart: Chart;
+  private element: HTMLElement;
   private lastTimestamp: number | undefined;
   private overlayIds = new Map<string, string[]>();
   constructor(element: HTMLElement) {
+    this.element = element;
     this.chart = init(element)!;
     this.chart.setStyles({
       grid: {
@@ -51,9 +54,9 @@ export class KLineChartAdapter {
       },
     });
   }
-  setCandles(candles: KLineData[]) {
+  setCandles(candles: KLineData[]): Promise<void> {
     this.lastTimestamp = candles.at(-1)?.timestamp;
-    this.chart.applyNewData(candles);
+    return new Promise((resolve) => this.chart.applyNewData(candles, false, resolve));
   }
   private saveOverlay(key: string, id: string | null | Array<string | null>) {
     const items = Array.isArray(id)
@@ -150,7 +153,8 @@ export class KLineChartAdapter {
       });
     for (const level of levels) {
       const id = this.chart.createOverlay({
-        name: level.end ? "straightLine" : "horizontalStraightLine",
+        // A strong zone is an actual price/time rectangle, not a disguised level line.
+        name: level.kind === "strong_zone" ? "rect" : level.end ? "straightLine" : "horizontalStraightLine",
         groupId: level.level_id,
         lock: false,
         points: level.end
@@ -159,7 +163,9 @@ export class KLineChartAdapter {
               { timestamp: level.end.timestamp, value: level.end.price },
             ]
           : [{ timestamp: level.start.timestamp, value: level.start.price }],
-        styles: { line: { color: "#8db4e6", size: 1 } },
+        styles: level.kind === "strong_zone"
+          ? { rect: { style: PolygonType.Fill, color: "rgba(141, 180, 230, 0.16)", borderColor: "#8db4e6", borderSize: 1 } }
+          : { line: { color: "#8db4e6", size: 1 } },
         onPressedMoveEnd: (event) => {
           const p = toPoint(event.overlay.points[0], this.lastTimestamp);
           if (p) onLevelEdit(level.level_id, p);
@@ -195,7 +201,28 @@ export class KLineChartAdapter {
     }
   }
   snapshot(): string {
-    return this.chart.getConvertPictureUrl(true, "png", "#111817") ?? "";
+    const rendered = this.chart.getConvertPictureUrl(true, "png", "#111817");
+    if (rendered.startsWith("data:image/png;base64,")) return rendered;
+    // KLineChart's composed-canvas exporter can be unavailable in some browser
+    // renderers. Compose its visible canvases as a deterministic local fallback.
+    const width = this.element.clientWidth, height = this.element.clientHeight;
+    if (!width || !height) return "";
+    const picture = document.createElement("canvas");
+    picture.width = width; picture.height = height;
+    const context = picture.getContext("2d");
+    if (!context) return "";
+    context.fillStyle = "#111817"; context.fillRect(0, 0, width, height);
+    const root = this.element.getBoundingClientRect();
+    for (const canvas of Array.from(this.element.querySelectorAll("canvas"))) {
+      const bounds = canvas.getBoundingClientRect();
+      if (bounds.width && bounds.height) context.drawImage(canvas, bounds.left - root.left, bounds.top - root.top, bounds.width, bounds.height);
+    }
+    return picture.toDataURL("image/png");
+  }
+  snapshotAfterRender(): Promise<string> {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve(this.snapshot())));
+    });
   }
   destroy() {
     dispose(this.chart);

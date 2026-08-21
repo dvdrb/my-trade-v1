@@ -74,6 +74,12 @@ class PriceLevel(BaseModel):
     end: PricePoint | None = None
     note: str | None = None
 
+    @model_validator(mode="after")
+    def zone_requires_two_corners(self) -> "PriceLevel":
+        if self.kind == "strong_zone" and self.end is None:
+            raise ValueError("strong_zone requires start and end coordinates")
+        return self
+
 
 class TradePlan(BaseModel):
     entry_price: float = Field(gt=0)
@@ -113,10 +119,23 @@ class HumanAnnotation(BaseModel):
 
     @model_validator(mode="after")
     def state_requirements(self) -> "HumanAnnotation":
+        if self.market_state == MarketState.NO_STRUCTURE and (self.side is not None or self.trade_plan is not None):
+            raise ValueError("no_structure cannot retain a side or trade plan")
+        if self.market_state == MarketState.VALID_TRIANGLE_NO_TRADE:
+            if not self.structures:
+                raise ValueError("valid_triangle_no_trade requires a structure")
+            if self.trade_plan is not None:
+                raise ValueError("valid_triangle_no_trade cannot retain a trade plan")
         if self.market_state in {MarketState.MAYBE_SETUP, MarketState.TRADE} and self.side is None:
             raise ValueError("side is required for maybe_setup and trade")
+        if self.market_state in {MarketState.MAYBE_SETUP, MarketState.TRADE} and not self.structures:
+            raise ValueError("maybe_setup and trade require a structure")
         if self.market_state == MarketState.TRADE and self.trade_plan is None:
             raise ValueError("trade plan is required for trade")
+        if self.trade_plan is not None and self.side is not None:
+            invalid = (self.side == HumanSide.LONG and not (self.trade_plan.stop_loss < self.trade_plan.entry_price < self.trade_plan.take_profit)) or (self.side == HumanSide.SHORT and not (self.trade_plan.take_profit < self.trade_plan.entry_price < self.trade_plan.stop_loss))
+            if invalid:
+                raise ValueError("trade plan is invalid for its selected direction")
         return self
 
 
@@ -128,6 +147,8 @@ class ReplaySession(BaseModel):
     ended_at_market_time: int | None = None
     status: Literal["active", "ended"] = "active"
     mode: Literal["free_replay", "reconstruct_real_trade", "review_bot_candidate"] = "free_replay"
+    selection_mode: Literal["random", "chosen_date", "reconstruct", "bot_review"] = "chosen_date"
+    pre_roll_candles: int = 200
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -142,7 +163,7 @@ class SimulatedTrade(BaseModel):
     stop_loss: float
     take_profit: float
     created_at_market_time: int
-    status: Literal["pending", "open", "stopped", "target", "manual_exit"] = "pending"
+    status: Literal["pending", "open", "stopped", "target", "manual_exit", "ambiguous"] = "pending"
     entry_time: int | None = None
     exit_time: int | None = None
     exit_price: float | None = None
@@ -168,3 +189,9 @@ class BotCandidateReview(BaseModel):
 class ScreenshotRequest(BaseModel):
     timeframe: Literal["15m", "1h", "4h"]
     image_data_url: str
+
+
+class CommitRequest(BaseModel):
+    annotation: HumanAnnotation
+    screenshots: dict[Literal["15m", "1h", "4h"], str]
+    place_trade: bool = False

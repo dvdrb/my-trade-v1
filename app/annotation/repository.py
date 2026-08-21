@@ -19,10 +19,11 @@ class AnnotationRepository:
 
     def create_session(self, session: ReplaySession) -> ReplaySession:
         self.connection.execute(
-            "INSERT INTO replay_sessions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO replay_sessions (session_id, symbol, started_at_market_time, replay_time, ended_at_market_time, status, mode, created_at, updated_at, selection_mode, pre_roll_candles) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (session.session_id, session.symbol, session.started_at_market_time, session.replay_time,
              session.ended_at_market_time, session.status, session.mode,
-             session.created_at.isoformat(), session.updated_at.isoformat()),
+             session.created_at.isoformat(), session.updated_at.isoformat(), session.selection_mode,
+             session.pre_roll_candles),
         )
         self.connection.commit()
         return session
@@ -68,6 +69,14 @@ class AnnotationRepository:
         query += " ORDER BY decision_time, created_at"
         return [HumanAnnotation.model_validate_json(row["payload"]) for row in self.connection.execute(query, args)]
 
+    def delete_annotation(self, annotation_id: str) -> None:
+        """Rollback an incomplete first commit; revisions use the explicit edit path."""
+        self.connection.execute("DELETE FROM annotation_screenshots WHERE annotation_id = ?", (annotation_id,))
+        self.connection.execute("DELETE FROM simulated_trades WHERE annotation_id = ?", (annotation_id,))
+        self.connection.execute("DELETE FROM annotation_revisions WHERE annotation_id = ?", (annotation_id,))
+        self.connection.execute("DELETE FROM human_annotations WHERE annotation_id = ?", (annotation_id,))
+        self.connection.commit()
+
     def revisions(self, annotation_id: str) -> list[HumanAnnotation]:
         return [HumanAnnotation.model_validate_json(row["payload"]) for row in self.connection.execute(
             "SELECT payload FROM annotation_revisions WHERE annotation_id = ? ORDER BY revision_number", (annotation_id,))]
@@ -89,19 +98,34 @@ class AnnotationRepository:
             query += " WHERE session_id = ?"; args = (session_id,)
         return [SimulatedTrade.model_validate_json(row["payload"]) for row in self.connection.execute(query, args)]
 
-    def save_screenshot(self, annotation_id: str, timeframe: str, image_data: bytes, root: str | Path) -> str:
-        directory = Path(root) / annotation_id
+    def revision_number(self, annotation_id: str) -> int:
+        return self.connection.execute(
+            "SELECT COALESCE(MAX(revision_number), 0) + 1 FROM annotation_revisions WHERE annotation_id = ?",
+            (annotation_id,),
+        ).fetchone()[0]
+
+    def save_screenshots(self, annotation_id: str, images: dict[str, bytes], root: str | Path) -> dict[str, str]:
+        revision = self.revision_number(annotation_id)
+        directory = Path(root) / annotation_id / f"revision_{revision:03d}"
         directory.mkdir(parents=True, exist_ok=True)
-        path = directory / f"{timeframe}.png"
-        path.write_bytes(image_data)
-        self.connection.execute("INSERT OR REPLACE INTO annotation_screenshots VALUES (?, ?, ?, ?, ?)",
-                                (str(uuid4()), annotation_id, timeframe, str(path), _now()))
+        paths: dict[str, str] = {}
+        for timeframe, image_data in images.items():
+            path = directory / f"{timeframe}.png"
+            path.write_bytes(image_data)
+            self.connection.execute(
+                "INSERT INTO annotation_screenshots (screenshot_id, annotation_id, timeframe, image_path, created_at, revision_number) VALUES (?, ?, ?, ?, ?, ?)",
+                (str(uuid4()), annotation_id, timeframe, str(path), _now(), revision),
+            )
+            paths[timeframe] = str(path)
         self.connection.commit()
-        return str(path)
+        return paths
+
+    def save_screenshot(self, annotation_id: str, timeframe: str, image_data: bytes, root: str | Path) -> str:
+        return self.save_screenshots(annotation_id, {timeframe: image_data}, root)[timeframe]
 
     def screenshots(self, annotation_id: str) -> list[dict[str, str]]:
         return [dict(row) for row in self.connection.execute(
-            "SELECT timeframe, image_path, created_at FROM annotation_screenshots WHERE annotation_id = ? ORDER BY timeframe", (annotation_id,))]
+            "SELECT timeframe, image_path, created_at, revision_number FROM annotation_screenshots WHERE annotation_id = ? AND revision_number = (SELECT MAX(revision_number) FROM annotation_screenshots WHERE annotation_id = ?) ORDER BY timeframe", (annotation_id, annotation_id))]
 
     def import_actual_trades(self, rows: list[dict[str, object]]) -> None:
         self.connection.executemany(

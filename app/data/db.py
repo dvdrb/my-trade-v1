@@ -12,6 +12,7 @@ def connect(db_path: str | Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
     return connection
 
 
@@ -100,6 +101,7 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
                 payload TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 UNIQUE(annotation_id, revision_number)
+                , FOREIGN KEY(annotation_id) REFERENCES human_annotations(annotation_id)
             );
 
             CREATE TABLE IF NOT EXISTS simulated_trades (
@@ -120,6 +122,8 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
                 payload TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+                , FOREIGN KEY(annotation_id) REFERENCES human_annotations(annotation_id)
+                , FOREIGN KEY(session_id) REFERENCES replay_sessions(session_id)
             );
 
             CREATE TABLE IF NOT EXISTS annotation_screenshots (
@@ -128,6 +132,7 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
                 timeframe TEXT NOT NULL,
                 image_path TEXT NOT NULL,
                 created_at TEXT NOT NULL
+                , FOREIGN KEY(annotation_id) REFERENCES human_annotations(annotation_id)
             );
             CREATE INDEX IF NOT EXISTS idx_annotation_screenshots_annotation ON annotation_screenshots(annotation_id);
 
@@ -150,10 +155,14 @@ def init_db(db_path: str | Path = DEFAULT_DB_PATH) -> None:
                 candidate_payload TEXT NOT NULL,
                 verdict TEXT NOT NULL,
                 created_at TEXT NOT NULL
+                , FOREIGN KEY(annotation_id) REFERENCES human_annotations(annotation_id)
             );
             """
         )
         _add_column(connection, "signals", "position_size", "REAL")
+        _add_column(connection, "replay_sessions", "selection_mode", "TEXT NOT NULL DEFAULT 'chosen_date'")
+        _add_column(connection, "replay_sessions", "pre_roll_candles", "INTEGER NOT NULL DEFAULT 200")
+        _add_column(connection, "annotation_screenshots", "revision_number", "INTEGER NOT NULL DEFAULT 1")
         _add_column(connection, "signals", "risk_amount", "REAL")
         _add_column(connection, "signals", "metadata", "TEXT NOT NULL DEFAULT '{}'")
         _add_column(connection, "trades", "signal_time", "INTEGER")

@@ -1,38 +1,74 @@
 # Human Trading Workstation
 
-The workstation is a local replay instrument for collecting the trader's own market structure and trade-plan decisions. It never sends orders and does not change the existing strategy.
+The workstation is a local, blind historical replay instrument for collecting human trading decisions. It never sends orders and it does not modify the trading strategy.
 
-## Launch
-
-Install project dependencies (including FastAPI and Uvicorn), then run:
+## Start
 
 ```bash
+python scripts/prepare_human_replay_data.py
 python scripts/strategy_annotator.py
 ```
 
-The first launch installs and builds the pinned local frontend dependencies if necessary, then the browser opens at `http://127.0.0.1:8765`. The backend only reads the local SQLite candle store. First import or fetch the approved Binance USD-M research candles into `data/bot.sqlite3`.
+The one-time preparation step copies only the approved train/validation candles from the local checksum-verified research database into `data/human_replay.sqlite3`; it never copies final-holdout data and never changes `data/bot.sqlite3`. The launcher rebuilds the local UI by default so it cannot serve stale source. Use `--skip-ui-build` only when deliberately reusing an existing build.
 
-## Workflow
+## Normal workflow
 
-Choose BTC, ETH, or SOL, press **Start Session**, and switch among 4h, 1h, and 15m. All panes request candles from the replay backend, which returns only candles at or before the session replay time. Use **Next** or **+5** (Right Arrow / Shift+Right) to advance.
+```text
+Start random replay
+→ inspect 4H
+→ inspect 1H
+→ inspect 15M
+→ draw what matters
+→ choose a decision
+→ if Trade, place a plan
+→ Record
+→ continue
+```
 
-Choose a structure role, press **T TRIANGLE**, and draw the upper then lower boundary directly on the KLineChart. Use the role selector for macro parent, local parent, entry, or other. The adapter persists timestamp/price coordinates, never pixels. Use free, weak, or strong snapping as appropriate. Choose a level kind and press **H LEVEL** for optional support, resistance, strong level, or zone annotations. Existing lines are draggable on-chart; the × controls delete a saved drawing. Undo/redo applies to the current unsaved annotation.
+Random Replay is the normal Batch 1 mode. The backend chooses only timestamps inside the approved train/validation research interval from `app/config/research_periods.yaml`; the final financial holdout cannot be entered. A replay also requires 200 closed 4H candles of pre-roll, and every chart request is bounded and future-safe.
 
-Set market state, direction, and confidence. Press **DRAW** beside Entry, Stop Loss, or Take Profit to place each draggable horizontal line; manual price entry is also available. Those price placements are authoritative. Commit the annotation, then place the simulated trade. As replay advances, entry and exit are simulated; an ambiguous candle where both stop and target touch is handled conservatively as a stop. An open trade can be manually exited at the current replay time.
+Each Record freezes one human decision and creates a clean, new draft. Do not use a previously recorded decision as a draft for a later market point. A saved decision is immutable; intentional corrections are revisions, with original payloads and screenshots retained.
 
-Edits retain the previous annotation payload in `annotation_revisions`. Reloading restores the latest session, drawings, trade plan, and simulated trades. Saving automatically captures KLineChart PNGs for 4h, 1h, and 15m alongside the exact structured annotation.
+## Decision definitions
 
-## Research exports
+- **Nothing here** — no meaningful tradable setup worth recording.
+- **Valid setup — Skip** — a real structure exists, but you would not take it.
+- **Maybe** — plausible, but not convincing enough to trade normally.
+- **Trade** — you would actually take it if live.
 
-Freeze a batch without overwriting old ones:
+For Trade, choose Long or Short and place Entry, Stop, and Target. Long requires `SL < Entry < TP`; Short requires `TP < Entry < SL`. Trade placement occurs only after the decision and all screenshots are saved.
+
+## Keyboard shortcuts
+
+```text
+Right Arrow       next candle
+Shift + Right     +5 candles
+T / H / Z         triangle / level / zone
+E / S / P         entry / stop / target
+1–5               confidence
+Cmd/Ctrl+Z        undo
+Cmd/Ctrl+Shift+Z  redo
+Enter             record
+```
+
+Shortcuts are disabled while typing in an input, select, textarea, or date picker. Help is always available from `? Help`.
+
+## Resume and research tools
+
+The active replay session is restored on refresh. Main capture mode intentionally does not show outcomes, PnL, win rate, or bot geometry. Bot Review and real-trade reconstruction belong in Research Tools and should not be used for primary blind Batch 1 collection.
+
+## Export a batch
 
 ```bash
 python scripts/export_human_ground_truth.py
-python scripts/extract_human_features.py
+python scripts/verify_human_ground_truth_batch.py data/human_ground_truth/batches/batch_001
 ```
 
-The batch has JSONL annotations/trades, manifest metadata, and SHA-256 sums. Do not edit a frozen batch; correct the source annotation and create a new batch instead.
+Exports are immutable: an existing batch is never overwritten. The manifest includes range, counts, symbols, screenshots, canonical screenshot revisions, and source commit where available. Verification checks JSONL schemas, checksums, unique annotation IDs, trade references, and screenshot presence.
 
-`data/human_ground_truth/actual_trades.csv` can be used as the source for reconstruction sessions: start a replay at or before the recorded entry time, redraw structures without future candles, and save the reconstructed annotation separately from the original trade record.
+## Important research rules
 
-Place an `actual_trades.csv` file at that path and restart the workstation; it is imported locally. Press **RECONSTRUCT** to begin before the first selected real-trade entry candle. Press **BOT REVIEW** to list baseline candidates, select one, redraw independently, save, then mark it Correct, Wrong, or Redraw. The bot candidate payload is stored separately and never replaces human geometry.
+- Do not redraw because a trade lost.
+- Do not inspect future candles.
+- Do not use Bot Review for primary Batch 1 collection.
+- Do not access the final financial holdout.

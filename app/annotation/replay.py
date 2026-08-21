@@ -21,9 +21,13 @@ def advance_time(candles: list[Candle], replay_time: int, count: int = 1) -> int
 
 
 def step_trade(trade: dict[str, object], candle: Candle) -> dict[str, object]:
-    """Apply a single candle conservatively: if SL and TP both touch, SL wins."""
+    """Apply one OHLC candle without fabricating an unobservable event order."""
     if trade["status"] == "pending":
         entry = float(trade["entry_price"])
+        stop, target = float(trade["stop_loss"]), float(trade["take_profit"])
+        if candle.low <= entry <= candle.high and (candle.low <= stop <= candle.high or candle.low <= target <= candle.high):
+            trade.update(status="ambiguous")
+            return trade
         if candle.low <= entry <= candle.high:
             trade.update(status="open", entry_time=candle.open_time)
     if trade["status"] != "open":
@@ -31,8 +35,10 @@ def step_trade(trade: dict[str, object], candle: Candle) -> dict[str, object]:
     side, stop, target = str(trade["side"]), float(trade["stop_loss"]), float(trade["take_profit"])
     stopped = candle.low <= stop if side == "long" else candle.high >= stop
     targeted = candle.high >= target if side == "long" else candle.low <= target
+    if stopped and targeted:
+        trade.update(status="ambiguous")
+        return trade
     if stopped or targeted:
-        # Conservative ambiguous-candle handling must never credit a target before a stop.
         exit_price, status = (stop, "stopped") if stopped else (target, "target")
         risk = abs(float(trade["entry_price"]) - stop)
         r = (exit_price - float(trade["entry_price"])) / risk
