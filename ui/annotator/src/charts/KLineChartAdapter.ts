@@ -15,7 +15,13 @@ import type {
   TradePlan,
   Triangle,
 } from "../types";
-import { completeTriangleAfterNativeDraw, hasThreeTriangleCoordinates } from "./triangleLifecycle";
+import {
+  canonicalTrianglePoint,
+  createTriangleTimeAxis,
+  hasThreeTriangleCoordinates,
+  overlayPointForTriangle,
+  type TriangleTimeAxis,
+} from "./triangleProjection";
 
 type SnapMode = "free" | "weak" | "strong";
 type DrawLine = (line: OverlayLine) => void;
@@ -73,6 +79,7 @@ export class KLineChartAdapter {
   private chart: Chart;
   private element: HTMLElement;
   private lastTimestamp: number | undefined;
+  private triangleTimeAxis: TriangleTimeAxis | null = null;
   private overlayIds = new Map<string, string[]>();
   constructor(element: HTMLElement) {
     this.element = element;
@@ -87,6 +94,7 @@ export class KLineChartAdapter {
   }
   setCandles(candles: KLineData[]): Promise<void> {
     this.lastTimestamp = candles.at(-1)?.timestamp;
+    this.triangleTimeAxis = createTriangleTimeAxis(candles.map((candle) => candle.timestamp));
     return new Promise((resolve) => this.chart.applyNewData(candles, false, resolve));
   }
   private saveOverlay(key: string, id: string | null | Array<string | null>) {
@@ -132,10 +140,7 @@ export class KLineChartAdapter {
         const vertices = this.triangleVertices(event);
         if (vertices) {
           traceTriangle("complete vertices", vertices);
-          // KLineChart has finished its third click before this callback, but React's
-          // restore path clears and recreates overlays. Let the native click handler
-          // return before that external state transition can remove this overlay.
-          completeTriangleAfterNativeDraw(vertices, complete);
+          complete(vertices);
         }
         return Boolean(vertices);
       },
@@ -143,12 +148,15 @@ export class KLineChartAdapter {
     this.saveOverlay("draft-triangle", id);
   }
   private triangleVertices(event: OverlayEvent): [Point, Point, Point] | null {
+    const axis = this.triangleTimeAxis;
+    if (!axis) return null;
+    traceTriangle("before canonical conversion", event.overlay.points);
     const vertices = event.overlay.points
-      .map(toPoint)
+      .map((point) => canonicalTrianglePoint(point, axis))
       .filter((point): point is Point => point !== null);
     const [first, second, third] = vertices;
-    const latestVisibleTimestamp = this.lastTimestamp;
-    if (!first || !second || !third || vertices.length !== 3 || latestVisibleTimestamp === undefined || vertices.some((point) => point.timestamp > latestVisibleTimestamp)) return null;
+    if (!first || !second || !third || vertices.length !== 3) return null;
+    traceTriangle("canonical stored geometry", vertices);
     return [first, second, third];
   }
   drawHorizontal(
@@ -192,8 +200,11 @@ export class KLineChartAdapter {
     for (const structure of structures) {
       const geometry = structure.geometry;
       if ("vertices" in geometry) {
-        const points = geometry.vertices.map((vertex) => ({ timestamp: vertex.timestamp, value: vertex.price }));
-        traceTriangle("restore points", points);
+        const axis = this.triangleTimeAxis;
+        if (!axis) continue;
+        traceTriangle("restore canonical input", geometry.vertices);
+        const points = geometry.vertices.map((vertex) => overlayPointForTriangle(axis, vertex));
+        traceTriangle("restore KLineChart overlay.points", points);
         const id = this.chart.createOverlay({
           name: humanTriangleOverlay,
           groupId: structure.structure_id,

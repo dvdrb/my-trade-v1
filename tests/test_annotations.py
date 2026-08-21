@@ -131,17 +131,17 @@ def test_human_triangle_serializes_three_vertices_and_legacy_lines_still_parse()
     assert isinstance(legacy.geometry, LegacyTriangleGeometry)
 
 
-def test_future_triangle_vertex_is_rejected_and_saved_geometry_reloads_exactly(tmp_path: Path) -> None:
+def test_projected_triangle_vertex_is_saved_without_exposing_future_candles(tmp_path: Path) -> None:
     client, db = seeded_client(tmp_path); session = create_session(client)
     payload = annotation_payload(session)
     vertices = payload["structures"][0]["geometry"]["vertices"]
-    vertices[2]["timestamp"] = int(session["replay_time"]) + 1
-    assert client.post("/api/annotations", json=payload).status_code == 422
-    vertices[2]["timestamp"] = int(session["replay_time"])
+    vertices[2]["timestamp"] = int(session["replay_time"]) + 15 * 60 * 1000
     saved = client.post("/api/annotations", json=payload)
     assert saved.status_code == 200, saved.text
     reloaded = AnnotationRepository(connect(db)).annotations()[0]
     assert reloaded.structures[0].geometry.model_dump(mode="json")["vertices"] == vertices
+    candles = client.get(f"/api/sessions/{session['session_id']}/candles/15m").json()
+    assert max(item["open_time"] for item in candles) <= session["replay_time"]
 
 
 def test_record_failure_does_not_create_trade_and_screenshot_revisions_are_retained(tmp_path: Path) -> None:

@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app.annotation.models import BotCandidateReview, CommitRequest, HumanAnnotation, ReplaySession, ScreenshotRequest, SimulatedTrade
+from app.annotation.models import BotCandidateReview, CommitRequest, HumanAnnotation, ReplaySession, ScreenshotRequest, SimulatedTrade, TriangleGeometry
 from app.annotation.replay import advance_time, step_trade, visible_candles
 from app.annotation.research_range import allowed_replay_range, choose_random_replay, human_research_bounds
 from app.annotation.repository import AnnotationRepository
@@ -72,6 +72,10 @@ def create_app(db_path: str | Path = "data/bot.sqlite3", *, research_periods_pat
         if annotation.symbol != session.symbol or annotation.decision_time != session.replay_time:
             raise HTTPException(422, "annotation decision time must be the current replay time for its session")
         for structure in annotation.structures:
+            # A v2 triangle vertex may deliberately project into the chart's blank
+            # time axis. It is user-created geometry, never a future observation.
+            if isinstance(structure.geometry, TriangleGeometry):
+                continue
             for point in geometry_points(structure.geometry):
                 if point.timestamp > session.replay_time:
                     raise HTTPException(422, "structure point is in the future")

@@ -50,6 +50,8 @@ export const toTimestamp = (value: number): number =>
 export const noFuturePoint = (point: Point, replayTime: number) =>
   point.timestamp <= replayTime;
 export const triangleVerticesAreReplaySafe = (vertices: [Point, Point, Point], replayTime: number) =>
-  vertices.every((point) => noFuturePoint(point, replayTime));
+  // A vertex can be a trader's geometric projection into blank chart space. This
+  // does not grant access to a future candle, outcome, or market observation.
+  vertices.every((point) => Number.isFinite(point.timestamp) && point.price > 0);
 export const isHumanTriangle = (geometry: Triangle["geometry"]): geometry is TriangleGeometry =>
   "vertices" in geometry;

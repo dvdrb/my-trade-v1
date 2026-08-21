@@ -1,1 +1,1 @@
-{"root":["./src/draft.ts","./src/main.tsx","./src/types.test.ts","./src/types.ts","./src/charts/klinechartadapter.ts"],"version":"5.6.3"}
+{"root":["./src/draft.ts","./src/main.tsx","./src/types.test.ts","./src/types.ts","./src/charts/klinechartadapter.ts","./src/charts/triangleprojection.ts"],"version":"5.6.3"}

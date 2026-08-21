@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { noFuturePoint, toTimestamp, triangleVerticesAreReplaySafe, type Annotation } from './types';
 import { createTriangle, forTimeframe, updateLevelCoordinates, updateTriangleVertices, withMarketState } from './draft';
-import { completeTriangleAfterNativeDraw, hasThreeTriangleCoordinates } from './charts/triangleLifecycle';
+import { canonicalTrianglePoint, createTriangleTimeAxis, dataIndexForTimestamp, hasThreeTriangleCoordinates, overlayPointForTriangle, timestampForDataIndex } from './charts/triangleProjection';
 
 describe('chart annotation domain boundaries', () => {
   it('normalizes seconds to timestamp milliseconds', () => {
@@ -37,8 +37,8 @@ describe('chart annotation domain boundaries', () => {
     }
   });
 
-  it('rejects a future triangle vertex before it can be saved', () => {
-    expect(triangleVerticesAreReplaySafe([{ timestamp: 10, price: 1 }, { timestamp: 20, price: 2 }, { timestamp: 21, price: 3 }], 20)).toBe(false);
+  it('keeps projection geometry distinct from future candle data', () => {
+    expect(triangleVerticesAreReplaySafe([{ timestamp: 10, price: 1 }, { timestamp: 20, price: 2 }, { timestamp: 21, price: 3 }], 20)).toBe(true);
   });
 
   it('renders only a finished three-coordinate triangle and never a fourth dynamic point', () => {
@@ -46,17 +46,16 @@ describe('chart annotation domain boundaries', () => {
     expect(hasThreeTriangleCoordinates([{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 }, { x: 4, y: 4 }])).toBe(false);
   });
 
-  it('waits until the native final-click handler has returned before updating React state', async () => {
-    const vertices = [{ timestamp: 1, price: 110 }, { timestamp: 2, price: 90 }, { timestamp: 3, price: 100 }] as [{ timestamp: number, price: number }, { timestamp: number, price: number }, { timestamp: number, price: number }];
-    const phases: string[] = [];
-    completeTriangleAfterNativeDraw(vertices, (completed) => {
-      phases.push('react');
-      expect(completed).toEqual(vertices);
-    });
-    phases.push('native-return');
-    expect(phases).toEqual(['native-return']);
-    await Promise.resolve();
-    expect(phases).toEqual(['native-return', 'react']);
+  it('round-trips loaded, nearby, and projected data indexes without pixels', () => {
+    const axis = createTriangleTimeAxis([1_000, 2_000, 3_000, 4_000]);
+    expect(axis).not.toBeNull();
+    const timeAxis = axis!;
+    expect(timestampForDataIndex(timeAxis, 2)).toBe(3_000);
+    expect(timestampForDataIndex(timeAxis, 6)).toBe(7_000);
+    expect(timestampForDataIndex(timeAxis, -2)).toBe(-1_000);
+    expect(canonicalTrianglePoint({ timestamp: 999_999, dataIndex: 6, value: 101 }, timeAxis)).toEqual({ timestamp: 7_000, price: 101 });
+    expect(dataIndexForTimestamp(timeAxis, 7_000)).toBe(6);
+    expect(overlayPointForTriangle(timeAxis, { timestamp: 7_000, price: 101 })).toEqual({ dataIndex: 6, value: 101 });
   });
 
   it('isolates structures and levels to their chart timeframe', () => {
