@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from app.annotation.models import Structure
+from app.annotation.triangle_adapter import derive_trendlines, geometry_points
 
 
 def structure_features(structure: Structure) -> dict[str, float | str]:
-    upper, lower = structure.geometry.upper_line, structure.geometry.lower_line
-    start = min(upper.p1.timestamp, upper.p2.timestamp, lower.p1.timestamp, lower.p2.timestamp)
-    end = max(upper.p1.timestamp, upper.p2.timestamp, lower.p1.timestamp, lower.p2.timestamp)
+    upper, lower = derive_trendlines(structure.geometry)
+    points = geometry_points(structure.geometry)
+    start = min(point.timestamp for point in points)
+    end = max(point.timestamp for point in points)
     duration = end - start
     upper_slope = (upper.p2.price - upper.p1.price) / (upper.p2.timestamp - upper.p1.timestamp)
     lower_slope = (lower.p2.price - lower.p1.price) / (lower.p2.timestamp - lower.p1.timestamp)

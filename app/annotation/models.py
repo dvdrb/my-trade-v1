@@ -8,7 +8,8 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, model_validator
 
 
-SCHEMA_VERSION = "human-ground-truth-v1"
+SCHEMA_VERSION = "human-ground-truth-v2"
+SUPPORTED_SCHEMA_VERSIONS = {"human-ground-truth-v1", SCHEMA_VERSION}
 
 
 def utc_now() -> datetime:
@@ -51,6 +52,23 @@ class TrendLine(BaseModel):
 
 
 class TriangleGeometry(BaseModel):
+    """The three market-coordinate vertices a trader actually drew."""
+
+    vertices: tuple[PricePoint, PricePoint, PricePoint]
+    snap_mode: Literal["free", "weak", "strong"] = "free"
+
+    @model_validator(mode="after")
+    def requires_distinct_vertices(self) -> "TriangleGeometry":
+        if len({(point.timestamp, point.price) for point in self.vertices}) != 3:
+            raise ValueError("triangle vertices must be distinct")
+        if len({point.timestamp for point in self.vertices}) < 2:
+            raise ValueError("triangle vertices must span at least two timestamps")
+        return self
+
+
+class LegacyTriangleGeometry(BaseModel):
+    """Pre-v2 two-line annotations, retained solely for read compatibility."""
+
     upper_line: TrendLine
     lower_line: TrendLine
     snap_mode: Literal["free", "weak", "strong"] = "free"
@@ -60,7 +78,7 @@ class Structure(BaseModel):
     structure_id: str = Field(default_factory=lambda: str(uuid4()))
     timeframe: Literal["15m", "1h", "4h"]
     role: StructureRole = StructureRole.OTHER
-    geometry: TriangleGeometry
+    geometry: TriangleGeometry | LegacyTriangleGeometry
     note: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)

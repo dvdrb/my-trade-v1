@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.annotation.models import HumanAnnotation, HumanSide, MarketState, PricePoint, ReplaySession, SimulatedTrade, Structure, StructureRole, TrendLine, TriangleGeometry
+from app.annotation.models import HumanAnnotation, HumanSide, LegacyTriangleGeometry, MarketState, PricePoint, ReplaySession, SimulatedTrade, Structure, StructureRole, TrendLine, TriangleGeometry
 from app.annotation.replay import step_trade, visible_candles
 from app.annotation.repository import AnnotationRepository
 from app.annotation.research_range import human_research_bounds
@@ -23,9 +23,11 @@ def candle(time: int, low: float = 90, high: float = 110) -> Candle:
 
 
 def structure(time: int = 1) -> Structure:
-    return Structure(timeframe="15m", role=StructureRole.ENTRY, geometry=TriangleGeometry(
-        upper_line=TrendLine(p1=PricePoint(timestamp=time - 1, price=110), p2=PricePoint(timestamp=time, price=108)),
-        lower_line=TrendLine(p1=PricePoint(timestamp=time - 1, price=90), p2=PricePoint(timestamp=time, price=92))))
+    start = max(0, time - 2)
+    return Structure(timeframe="15m", role=StructureRole.ENTRY, geometry=TriangleGeometry(vertices=(
+        PricePoint(timestamp=start, price=110), PricePoint(timestamp=start + 1, price=90),
+        PricePoint(timestamp=start + 2, price=100),
+    )))
 
 
 def seeded_client(tmp_path: Path) -> tuple[TestClient, int]:
@@ -112,6 +114,34 @@ def test_state_invariants_and_directional_plans() -> None:
         HumanAnnotation(session_id="s", symbol="BTC", decision_time=1, market_state=MarketState.TRADE, side=HumanSide.LONG, trade_plan={"entry_price": 100, "stop_loss": 95, "take_profit": 110})
     with pytest.raises(ValueError, match="invalid for its selected direction"):
         HumanAnnotation(session_id="s", symbol="BTC", decision_time=1, market_state=MarketState.TRADE, side=HumanSide.LONG, structures=[structure()], trade_plan={"entry_price": 100, "stop_loss": 105, "take_profit": 110})
+
+
+def test_human_triangle_serializes_three_vertices_and_legacy_lines_still_parse() -> None:
+    canonical = structure(10)
+    assert canonical.model_dump(mode="json")["geometry"] == {
+        "vertices": [
+            {"timestamp": 8, "price": 110.0}, {"timestamp": 9, "price": 90.0}, {"timestamp": 10, "price": 100.0},
+        ],
+        "snap_mode": "free",
+    }
+    legacy = Structure.model_validate({"timeframe": "15m", "role": "entry", "geometry": {
+        "upper_line": {"p1": {"timestamp": 1, "price": 110}, "p2": {"timestamp": 3, "price": 100}},
+        "lower_line": {"p1": {"timestamp": 1, "price": 90}, "p2": {"timestamp": 3, "price": 100}},
+    }})
+    assert isinstance(legacy.geometry, LegacyTriangleGeometry)
+
+
+def test_future_triangle_vertex_is_rejected_and_saved_geometry_reloads_exactly(tmp_path: Path) -> None:
+    client, db = seeded_client(tmp_path); session = create_session(client)
+    payload = annotation_payload(session)
+    vertices = payload["structures"][0]["geometry"]["vertices"]
+    vertices[2]["timestamp"] = int(session["replay_time"]) + 1
+    assert client.post("/api/annotations", json=payload).status_code == 422
+    vertices[2]["timestamp"] = int(session["replay_time"])
+    saved = client.post("/api/annotations", json=payload)
+    assert saved.status_code == 200, saved.text
+    reloaded = AnnotationRepository(connect(db)).annotations()[0]
+    assert reloaded.structures[0].geometry.model_dump(mode="json")["vertices"] == vertices
 
 
 def test_record_failure_does_not_create_trade_and_screenshot_revisions_are_retained(tmp_path: Path) -> None:

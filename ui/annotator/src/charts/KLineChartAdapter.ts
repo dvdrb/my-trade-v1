@@ -3,6 +3,7 @@ import {
   init,
   OverlayMode,
   PolygonType,
+  registerOverlay,
   type Chart,
   type KLineData,
   type OverlayEvent,
@@ -36,6 +37,28 @@ const toLine = (event: OverlayEvent): OverlayLine | null => {
     .filter((point): point is Point => point !== null);
   return points.length === 2 ? { p1: points[0], p2: points[1] } : null;
 };
+const humanTriangleOverlay = "humanTriangle";
+
+registerOverlay({
+  name: humanTriangleOverlay,
+  // KLineChart counts its initial point as step one, so four steps are three clicks.
+  totalStep: 4,
+  needDefaultPointFigure: true,
+  createPointFigures: ({ coordinates }) => coordinates.length === 3
+    ? [{
+        type: "polygon",
+        attrs: { coordinates },
+        styles: {
+          style: PolygonType.StrokeFill,
+          color: "rgba(114, 232, 180, 0.08)",
+          borderColor: "#72e8b4",
+          borderSize: 2,
+        },
+        // The default point figures are the only drag handles; the triangle body stays passive.
+        ignoreEvent: true,
+      }]
+    : [],
+});
 
 // This module is the KLineChart boundary. Nothing outside it stores overlay IDs or pixels.
 export class KLineChartAdapter {
@@ -87,6 +110,28 @@ export class KLineChartAdapter {
     });
     this.saveOverlay(`draft-${label}`, id);
   }
+  drawTriangle(snap: SnapMode, complete: (vertices: [Point, Point, Point]) => void) {
+    const id = this.chart.createOverlay({
+      name: humanTriangleOverlay,
+      groupId: "draft-triangle",
+      mode: mode(snap),
+      onDrawEnd: (event) => {
+        const vertices = this.triangleVertices(event);
+        if (vertices) complete(vertices);
+        return Boolean(vertices);
+      },
+    });
+    this.saveOverlay("draft-triangle", id);
+  }
+  private triangleVertices(event: OverlayEvent): [Point, Point, Point] | null {
+    const vertices = event.overlay.points
+      .map(toPoint)
+      .filter((point): point is Point => point !== null);
+    const [first, second, third] = vertices;
+    const latestVisibleTimestamp = this.lastTimestamp;
+    if (!first || !second || !third || vertices.length !== 3 || latestVisibleTimestamp === undefined || vertices.some((point) => point.timestamp > latestVisibleTimestamp)) return null;
+    return [first, second, third];
+  }
   drawHorizontal(
     label: string,
     snap: SnapMode,
@@ -112,6 +157,7 @@ export class KLineChartAdapter {
     levels: PriceLevel[],
     plan: TradePlan | null,
     side: "long" | "short" | null,
+    onTriangleEdit: (id: string, vertices: [Point, Point, Point]) => void,
     onStructureEdit: (
       id: string,
       line: "upper" | "lower",
@@ -124,17 +170,34 @@ export class KLineChartAdapter {
     ) => void,
   ) {
     this.clear();
-    for (const structure of structures)
+    for (const structure of structures) {
+      const geometry = structure.geometry;
+      if ("vertices" in geometry) {
+        const id = this.chart.createOverlay({
+          name: humanTriangleOverlay,
+          groupId: structure.structure_id,
+          lock: false,
+          mode: mode(geometry.snap_mode),
+          points: geometry.vertices.map((vertex) => ({ timestamp: vertex.timestamp, value: vertex.price })),
+          onPressedMoveEnd: (event) => {
+            const vertices = this.triangleVertices(event);
+            if (vertices) onTriangleEdit(structure.structure_id, vertices);
+            return true;
+          },
+        });
+        this.saveOverlay(structure.structure_id, id);
+        continue;
+      }
       (["upper", "lower"] as const).forEach((which) => {
         const line =
           which === "upper"
-            ? structure.geometry.upper_line
-            : structure.geometry.lower_line;
+            ? geometry.upper_line
+            : geometry.lower_line;
         const id = this.chart.createOverlay({
           name: "straightLine",
           groupId: structure.structure_id,
           lock: false,
-          mode: mode(structure.geometry.snap_mode),
+          mode: mode(geometry.snap_mode),
           points: [
             { timestamp: line.p1.timestamp, value: line.p1.price },
             { timestamp: line.p2.timestamp, value: line.p2.price },
@@ -151,6 +214,7 @@ export class KLineChartAdapter {
         });
         this.saveOverlay(`${structure.structure_id}-${which}`, id);
       });
+    }
     for (const level of levels) {
       const id = this.chart.createOverlay({
         // A strong zone is an actual price/time rectangle, not a disguised level line.

@@ -17,6 +17,7 @@ from app.annotation.models import BotCandidateReview, CommitRequest, HumanAnnota
 from app.annotation.replay import advance_time, step_trade, visible_candles
 from app.annotation.research_range import allowed_replay_range, choose_random_replay, human_research_bounds
 from app.annotation.repository import AnnotationRepository
+from app.annotation.triangle_adapter import geometry_points
 from app.data.db import connect, init_db
 from app.data.repositories import CandleRepository
 from app.config.settings import load_config
@@ -71,7 +72,7 @@ def create_app(db_path: str | Path = "data/bot.sqlite3", *, research_periods_pat
         if annotation.symbol != session.symbol or annotation.decision_time != session.replay_time:
             raise HTTPException(422, "annotation decision time must be the current replay time for its session")
         for structure in annotation.structures:
-            for point in (structure.geometry.upper_line.p1, structure.geometry.upper_line.p2, structure.geometry.lower_line.p1, structure.geometry.lower_line.p2):
+            for point in geometry_points(structure.geometry):
                 if point.timestamp > session.replay_time:
                     raise HTTPException(422, "structure point is in the future")
         for level in annotation.levels:

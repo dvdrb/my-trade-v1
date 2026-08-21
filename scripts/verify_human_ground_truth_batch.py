@@ -5,7 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from app.annotation.models import HumanAnnotation, SCHEMA_VERSION, SimulatedTrade
+from app.annotation.models import HumanAnnotation, SUPPORTED_SCHEMA_VERSIONS, SimulatedTrade
 
 
 def digest(path: Path) -> str:
@@ -18,7 +18,7 @@ def verify(batch: Path) -> list[str]:
     if not all(path.is_file() for path in (manifest_path, annotations_path, trades_path, sums_path)):
         return ["batch is missing a required artifact"]
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("schema_version") != SCHEMA_VERSION:
+    if manifest.get("schema_version") not in SUPPORTED_SCHEMA_VERSIONS:
         errors.append("unsupported schema version")
     annotations = [HumanAnnotation.model_validate_json(line) for line in annotations_path.read_text(encoding="utf-8").splitlines() if line]
     trades = [SimulatedTrade.model_validate_json(line) for line in trades_path.read_text(encoding="utf-8").splitlines() if line]

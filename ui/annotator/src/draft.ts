@@ -1,4 +1,4 @@
-import type { Annotation, Point, Timeframe } from "./types";
+import type { Annotation, Point, Timeframe, Triangle, TriangleGeometry } from "./types";
 
 export const forTimeframe = (draft: Annotation, timeframe: Timeframe): Annotation => ({
   ...draft,
@@ -20,4 +20,17 @@ export const updateLevelCoordinates = (
     : level.kind === "strong_zone" && end
       ? { ...level, start, end }
       : { ...level, start },
+);
+
+export const createTriangle = (
+  structure_id: string, timeframe: Timeframe, role: string,
+  vertices: [Point, Point, Point], snap_mode: TriangleGeometry["snap_mode"],
+): Triangle & { geometry: TriangleGeometry } => ({ structure_id, timeframe, role, geometry: { vertices, snap_mode } });
+
+export const updateTriangleVertices = (
+  structures: Triangle[], structureId: string, vertices: [Point, Point, Point],
+): Triangle[] => structures.map((structure) =>
+  structure.structure_id === structureId && "vertices" in structure.geometry
+    ? { ...structure, geometry: { ...structure.geometry, vertices } }
+    : structure,
 );

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { KLineChartAdapter } from "./charts/KLineChartAdapter";
-import { forTimeframe, updateLevelCoordinates, withMarketState } from "./draft";
+import { createTriangle, forTimeframe, updateLevelCoordinates, updateTriangleVertices, withMarketState } from "./draft";
 import type { Annotation, OverlayLine, PriceLevel, Timeframe, TradePlan, Triangle } from "./types";
 import "./style.css";
 
@@ -20,7 +20,7 @@ const api = async <T,>(path: string, options?: RequestInit): Promise<T> => {
 const blank = (session: Session): Annotation => ({ annotation_id: crypto.randomUUID(), session_id: session.session_id, symbol: session.symbol, decision_time: session.replay_time, market_state: "no_structure", structures: [], levels: [], notes: "" });
 const roleFor = (timeframe: Timeframe): Triangle["role"] => ({ "4h": "macro_parent", "1h": "local_parent", "15m": "entry" })[timeframe];
 const dateInput = (timestamp: number) => new Date(timestamp).toISOString().slice(0, 16);
-const updateLine = (items: Triangle[], id: string, side: "upper" | "lower", line: OverlayLine) => items.map((item) => item.structure_id === id ? { ...item, geometry: { ...item.geometry, [`${side}_line`]: line } } : item);
+const updateLegacyLine = (items: Triangle[], id: string, side: "upper" | "lower", line: OverlayLine) => items.map((item) => item.structure_id === id && "upper_line" in item.geometry ? { ...item, geometry: { ...item.geometry, [`${side}_line`]: line } } : item);
 
 function App() {
   const element = useRef<HTMLDivElement>(null);
@@ -54,7 +54,8 @@ function App() {
     if (!draft || !chart.current) return;
     const visible = forTimeframe(draft, tf);
     chart.current.restore(visible.structures, visible.levels, visible.trade_plan ?? null, visible.side ?? null,
-      (id, side, line) => editable && change((item) => ({ ...item, structures: updateLine(item.structures, id, side, line) })),
+      (id, vertices) => editable && change((item) => ({ ...item, structures: updateTriangleVertices(item.structures, id, vertices) })),
+      (id, side, line) => editable && change((item) => ({ ...item, structures: updateLegacyLine(item.structures, id, side, line) })),
       (id, start, end) => editable && change((item) => ({ ...item, levels: updateLevelCoordinates(item.levels, id, start, end) })),
       (key, price) => editable && change((item) => ({ ...item, trade_plan: item.trade_plan ? { ...item.trade_plan, [key]: price } : item.trade_plan })),
     );
@@ -97,7 +98,7 @@ function App() {
     } catch (error) { setStatus(String(error)); }
   };
   const advance = async (count: number) => { if (!session) return; try { const next = await api<Session>(`/sessions/${session.session_id}/advance`, { method: "POST", body: JSON.stringify({ count }) }); setSession(next); setAnnotation((draft) => draft ? { ...draft, decision_time: next.replay_time } : draft); await reload(next); setTrades(await api<Trade[]>(`/sessions/${next.session_id}/trades`)); } catch (error) { setStatus(String(error)); } };
-  const triangle = () => chart.current?.drawSegment("upper", snap, (upper) => chart.current?.drawSegment("lower", snap, (lower) => change((draft) => ({ ...draft, structures: [...draft.structures, { structure_id: crypto.randomUUID(), timeframe, role: roleFor(timeframe), geometry: { upper_line: upper, lower_line: lower, snap_mode: snap } }] }))));
+  const triangle = () => chart.current?.drawTriangle(snap, (vertices) => change((draft) => ({ ...draft, structures: [...draft.structures, createTriangle(crypto.randomUUID(), timeframe, roleFor(timeframe), vertices, snap)] })));
   const zone = () => chart.current?.drawSegment("zone", snap, (first) => chart.current?.drawSegment("zone-end", snap, (second) => change((draft) => ({ ...draft, levels: [...draft.levels, { level_id: crypto.randomUUID(), timeframe, kind: "strong_zone", start: first.p1, end: second.p2 }] }))));
   const level = () => levelKind === "strong_zone" ? zone() : chart.current?.drawHorizontal("level", snap, (point) => change((draft) => ({ ...draft, levels: [...draft.levels, { level_id: crypto.randomUUID(), timeframe, kind: levelKind, start: point }] })));
   const plan = (key: keyof TradePlan) => chart.current?.drawHorizontal(key, snap, (point) => change((draft) => ({ ...draft, trade_plan: { entry_price: draft.trade_plan?.entry_price ?? point.price, stop_loss: draft.trade_plan?.stop_loss ?? point.price, take_profit: draft.trade_plan?.take_profit ?? point.price, [key]: point.price } })));

@@ -28,6 +28,10 @@ Random Replay is the normal Batch 1 mode. The backend chooses only timestamps in
 
 Each Record freezes one human decision and creates a clean, new draft. Do not use a previously recorded decision as a draft for a later market point. A saved decision is immutable; intentional corrections are revisions, with original payloads and screenshots retained.
 
+## Drawing triangles
+
+`TRIANGLE` (or `T`) is one three-click action: click each visual vertex, then the chart closes the triangle. The three timestamp/price vertices are the canonical human record, remain individually draggable, and are restored exactly when switching timeframes or reopening the workstation. New triangles use the automatic role for their chart: 4H macro parent, 1H local parent, and 15M entry.
+
 ## Decision definitions
 
 - **Nothing here** — no meaningful tradable setup worth recording.
