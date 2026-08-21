@@ -98,7 +98,12 @@ function App() {
     } catch (error) { setStatus(String(error)); }
   };
   const advance = async (count: number) => { if (!session) return; try { const next = await api<Session>(`/sessions/${session.session_id}/advance`, { method: "POST", body: JSON.stringify({ count }) }); setSession(next); setAnnotation((draft) => draft ? { ...draft, decision_time: next.replay_time } : draft); await reload(next); setTrades(await api<Trade[]>(`/sessions/${next.session_id}/trades`)); } catch (error) { setStatus(String(error)); } };
-  const triangle = () => chart.current?.drawTriangle(snap, (vertices) => change((draft) => ({ ...draft, structures: [...draft.structures, createTriangle(crypto.randomUUID(), timeframe, roleFor(timeframe), vertices, snap)] })));
+  const triangle = () => chart.current?.drawTriangle(snap, (vertices) => {
+    const structure = createTriangle(crypto.randomUUID(), timeframe, roleFor(timeframe), vertices, snap);
+    if (new URLSearchParams(window.location.search).has("triangleTrace"))
+      console.debug(`[humanTriangle] createTriangle vertices ${JSON.stringify(structure.geometry.vertices)}`);
+    change((draft) => ({ ...draft, structures: [...draft.structures, structure] }));
+  });
   const zone = () => chart.current?.drawSegment("zone", snap, (first) => chart.current?.drawSegment("zone-end", snap, (second) => change((draft) => ({ ...draft, levels: [...draft.levels, { level_id: crypto.randomUUID(), timeframe, kind: "strong_zone", start: first.p1, end: second.p2 }] }))));
   const level = () => levelKind === "strong_zone" ? zone() : chart.current?.drawHorizontal("level", snap, (point) => change((draft) => ({ ...draft, levels: [...draft.levels, { level_id: crypto.randomUUID(), timeframe, kind: levelKind, start: point }] })));
   const plan = (key: keyof TradePlan) => chart.current?.drawHorizontal(key, snap, (point) => change((draft) => ({ ...draft, trade_plan: { entry_price: draft.trade_plan?.entry_price ?? point.price, stop_loss: draft.trade_plan?.stop_loss ?? point.price, take_profit: draft.trade_plan?.take_profit ?? point.price, [key]: point.price } })));

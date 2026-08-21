@@ -15,6 +15,7 @@ import type {
   TradePlan,
   Triangle,
 } from "../types";
+import { completeTriangleAfterNativeDraw, hasThreeTriangleCoordinates } from "./triangleLifecycle";
 
 type SnapMode = "free" | "weak" | "strong";
 type DrawLine = (line: OverlayLine) => void;
@@ -38,14 +39,20 @@ const toLine = (event: OverlayEvent): OverlayLine | null => {
   return points.length === 2 ? { p1: points[0], p2: points[1] } : null;
 };
 const humanTriangleOverlay = "humanTriangle";
+const traceTriangle = (stage: string, value: unknown) =>
+  new URLSearchParams(window.location.search).has("triangleTrace") &&
+  console.debug(`[humanTriangle] ${stage} ${JSON.stringify(value)}`);
 
 registerOverlay({
   name: humanTriangleOverlay,
-  // KLineChart counts its initial point as step one, so four steps are three clicks.
+  // KLineChart finishes when points.length reaches totalStep - 1. Four therefore
+  // represents a three-click interactive triangle, and three restored points are static.
   totalStep: 4,
   needDefaultPointFigure: true,
-  createPointFigures: ({ coordinates }) => coordinates.length === 3
-    ? [{
+  createPointFigures: ({ coordinates }) => {
+    traceTriangle("createPointFigures coordinates", coordinates);
+    return hasThreeTriangleCoordinates(coordinates)
+      ? [{
         type: "polygon",
         attrs: { coordinates },
         styles: {
@@ -57,7 +64,8 @@ registerOverlay({
         // The default point figures are the only drag handles; the triangle body stays passive.
         ignoreEvent: true,
       }]
-    : [],
+      : [];
+  },
 });
 
 // This module is the KLineChart boundary. Nothing outside it stores overlay IDs or pixels.
@@ -115,9 +123,20 @@ export class KLineChartAdapter {
       name: humanTriangleOverlay,
       groupId: "draft-triangle",
       mode: mode(snap),
+      onDrawing: (event) => {
+        traceTriangle("drawing points", event.overlay.points);
+        return true;
+      },
       onDrawEnd: (event) => {
+        traceTriangle("onDrawEnd points", event.overlay.points);
         const vertices = this.triangleVertices(event);
-        if (vertices) complete(vertices);
+        if (vertices) {
+          traceTriangle("complete vertices", vertices);
+          // KLineChart has finished its third click before this callback, but React's
+          // restore path clears and recreates overlays. Let the native click handler
+          // return before that external state transition can remove this overlay.
+          completeTriangleAfterNativeDraw(vertices, complete);
+        }
         return Boolean(vertices);
       },
     });
@@ -173,12 +192,14 @@ export class KLineChartAdapter {
     for (const structure of structures) {
       const geometry = structure.geometry;
       if ("vertices" in geometry) {
+        const points = geometry.vertices.map((vertex) => ({ timestamp: vertex.timestamp, value: vertex.price }));
+        traceTriangle("restore points", points);
         const id = this.chart.createOverlay({
           name: humanTriangleOverlay,
           groupId: structure.structure_id,
           lock: false,
           mode: mode(geometry.snap_mode),
-          points: geometry.vertices.map((vertex) => ({ timestamp: vertex.timestamp, value: vertex.price })),
+          points,
           onPressedMoveEnd: (event) => {
             const vertices = this.triangleVertices(event);
             if (vertices) onTriangleEdit(structure.structure_id, vertices);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { noFuturePoint, toTimestamp, triangleVerticesAreReplaySafe, type Annotation } from './types';
 import { createTriangle, forTimeframe, updateLevelCoordinates, updateTriangleVertices, withMarketState } from './draft';
+import { completeTriangleAfterNativeDraw, hasThreeTriangleCoordinates } from './charts/triangleLifecycle';
 
 describe('chart annotation domain boundaries', () => {
   it('normalizes seconds to timestamp milliseconds', () => {
@@ -38,6 +39,24 @@ describe('chart annotation domain boundaries', () => {
 
   it('rejects a future triangle vertex before it can be saved', () => {
     expect(triangleVerticesAreReplaySafe([{ timestamp: 10, price: 1 }, { timestamp: 20, price: 2 }, { timestamp: 21, price: 3 }], 20)).toBe(false);
+  });
+
+  it('renders only a finished three-coordinate triangle and never a fourth dynamic point', () => {
+    expect(hasThreeTriangleCoordinates([{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 }])).toBe(true);
+    expect(hasThreeTriangleCoordinates([{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 }, { x: 4, y: 4 }])).toBe(false);
+  });
+
+  it('waits until the native final-click handler has returned before updating React state', async () => {
+    const vertices = [{ timestamp: 1, price: 110 }, { timestamp: 2, price: 90 }, { timestamp: 3, price: 100 }] as [{ timestamp: number, price: number }, { timestamp: number, price: number }, { timestamp: number, price: number }];
+    const phases: string[] = [];
+    completeTriangleAfterNativeDraw(vertices, (completed) => {
+      phases.push('react');
+      expect(completed).toEqual(vertices);
+    });
+    phases.push('native-return');
+    expect(phases).toEqual(['native-return']);
+    await Promise.resolve();
+    expect(phases).toEqual(['native-return', 'react']);
   });
 
   it('isolates structures and levels to their chart timeframe', () => {
