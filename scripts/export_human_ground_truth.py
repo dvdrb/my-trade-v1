@@ -25,7 +25,16 @@ def main() -> None:
     parser.add_argument("--db", default=DEFAULT_HUMAN_REPLAY_DB); parser.add_argument("--output", default="data/human_ground_truth/batches")
     parser.add_argument("--batch", default=None); args = parser.parse_args()
     init_db(args.db); repository = AnnotationRepository(connect(args.db))
-    annotations, trades = repository.annotations(), repository.trades()
+    session_modes = {session.session_id: session.mode for session in repository.sessions()}
+    all_annotations, all_trades = repository.annotations(), repository.trades()
+    annotations = [annotation for annotation in all_annotations if session_modes.get(annotation.session_id) == "free_replay"]
+    included_annotation_ids = {annotation.annotation_id for annotation in annotations}
+    trades = [trade for trade in all_trades if trade.annotation_id in included_annotation_ids]
+    excluded_by_mode: dict[str, int] = {}
+    for annotation in all_annotations:
+        mode = session_modes.get(annotation.session_id, "unknown")
+        if mode != "free_replay":
+            excluded_by_mode[mode] = excluded_by_mode.get(mode, 0) + 1
     root = Path(args.output); root.mkdir(parents=True, exist_ok=True)
     batch_name = args.batch or f"batch_{len([p for p in root.iterdir() if p.is_dir()]) + 1:03d}"
     batch = root / batch_name
@@ -54,6 +63,9 @@ def main() -> None:
                 "symbols": sorted({a.symbol for a in annotations}), "market_range": [min(times), max(times)] if times else None,
                 "session_count": len({a.session_id for a in annotations}), "screenshot_count": len(screenshot_files),
                 "canonical_annotation_revisions": {a.annotation_id: (repository.screenshots(a.annotation_id)[0].get("revision_number", 1) if repository.screenshots(a.annotation_id) else 1) for a in annotations},
+                "included_session_ids": sorted({a.session_id for a in annotations}),
+                "included_session_modes": sorted({session_modes[a.session_id] for a in annotations}),
+                "excluded_annotation_count_by_session_mode": excluded_by_mode,
                 "source_code_commit": source_commit}
     (batch / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     files = [annotation_file, trade_file, batch / "manifest.json", *screenshot_files]

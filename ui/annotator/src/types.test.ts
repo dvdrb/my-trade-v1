@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { noFuturePoint, toTimestamp, triangleVerticesAreReplaySafe, type Annotation } from './types';
-import { createStrongPoint, createTrendline, createTriangle, forTimeframe, updateLevelCoordinates, updateStrongPoint, updateTrendline, updateTriangleVertices, withMarketState } from './draft';
+import { createStrongPoint, createTrendline, createTriangle, forTimeframe, normalizeStoredDraft, planIsDirectional, updateLevelCoordinates, updateStrongPoint, updateTrendline, updateTriangleVertices, withMarketState } from './draft';
 import { canonicalTrianglePoint, createTriangleTimeAxis, dataIndexForTimestamp, hasThreeTriangleCoordinates, overlayPointForTriangle, timestampForDataIndex } from './charts/triangleProjection';
 
 describe('chart annotation domain boundaries', () => {
@@ -90,5 +90,23 @@ describe('chart annotation domain boundaries', () => {
     const saved = { ...annotation, levels: updateLevelCoordinates(annotation.levels, 'zone', start, end) };
     const reloaded = JSON.parse(JSON.stringify(saved)) as Annotation;
     expect(forTimeframe(reloaded, '1h').levels[0]).toMatchObject({ start, end });
+  });
+
+  it('normalizes an older local draft without v3 drawing arrays', () => {
+    const restored = normalizeStoredDraft({ annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 1, market_state: 'no_structure' }, { session_id: 's', symbol: 'BTC', replay_time: 2 });
+    expect(restored?.annotation).toMatchObject({ decision_time: 2, structures: [], trendlines: [], strong_points: [], levels: [], notes: '' });
+    expect(restored?.decisionSelected).toBe(false);
+  });
+
+  it('preserves a coherent decision lock and rejects a stale one', () => {
+    const annotation: Annotation = { annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 5, market_state: 'no_structure', structures: [], trendlines: [], strong_points: [], levels: [] };
+    expect(normalizeStoredDraft({ annotation, decisionSelected: true, decisionLockedAt: 5 }, { session_id: 's', symbol: 'BTC', replay_time: 5 })?.decisionLockedAt).toBe(5);
+    expect(normalizeStoredDraft({ annotation, decisionSelected: true, decisionLockedAt: 4 }, { session_id: 's', symbol: 'BTC', replay_time: 5 })).toBeNull();
+  });
+
+  it('validates directional plans before recording', () => {
+    const long: Annotation = { annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 1, market_state: 'trade', side: 'long', structures: [], trendlines: [], strong_points: [], levels: [], trade_plan: { entry_price: 100, stop_loss: 95, take_profit: 110 } };
+    expect(planIsDirectional(long)).toBe(true);
+    expect(planIsDirectional({ ...long, trade_plan: { entry_price: 100, stop_loss: 105, take_profit: 110 } })).toBe(false);
   });
 });

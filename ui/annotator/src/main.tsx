@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { KLineChartAdapter } from "./charts/KLineChartAdapter";
-import { createStrongPoint, createTrendline, createTriangle, forTimeframe, updateLevelCoordinates, updateStrongPoint, updateTrendline, updateTriangleVertices, withMarketState } from "./draft";
-import type { Annotation, HumanTrendline, OverlayLine, PriceLevel, StrongPoint, Timeframe, TradePlan, Triangle } from "./types";
+import { createStrongPoint, createTrendline, createTriangle, forTimeframe, normalizeStoredDraft, planIsDirectional, updateLevelCoordinates, updateStrongPoint, updateTrendline, updateTriangleVertices, withMarketState } from "./draft";
+import type { Annotation, HumanTrendline, OverlayLine, PriceLevel, StrongPoint, Timeframe, Triangle } from "./types";
 import "./style.css";
 
 type Session = { session_id: string; symbol: string; replay_time: number; mode: string };
 type ReplayRange = { earliest_valid: number; latest_valid: number; pre_roll_candles: number };
-type Trade = { simulated_trade_id: string; status: string };
+type Trade = { simulated_trade_id: string; status: "pending" | "open" | "stopped" | "target" | "manual_exit" | "ambiguous"; symbol: string; side: "long" | "short"; entry_price: number; stop_loss: number; take_profit: number };
 type ActualTrade = { trade_id: string; entry_time: number; side: "long" | "short" };
 type Candidate = { decision_time: number; side: "long" | "short" };
 const timeframes: Timeframe[] = ["4h", "1h", "15m"];
@@ -26,6 +26,8 @@ const updateLegacyLine = (items: Triangle[], id: string, side: "upper" | "lower"
 function App() {
   const element = useRef<HTMLDivElement>(null);
   const chart = useRef<KLineChartAdapter>();
+  const operationRef = useRef<string | null>(null);
+  const requestVersionRef = useRef(0);
   const [session, setSession] = useState<Session | null>(null);
   const [symbol, setSymbol] = useState("BTC");
   const [timeframe, setTimeframe] = useState<Timeframe>("15m");
@@ -42,6 +44,16 @@ function App() {
   const [help, setHelp] = useState(false);
   const [tutorial, setTutorial] = useState(() => localStorage.getItem("annotator-tutorial-seen") !== "true");
   const [tutorialStep, setTutorialStep] = useState(0);
+  const [decisionSelected, setDecisionSelected] = useState(false);
+  const [decisionLockedAt, setDecisionLockedAt] = useState<number | null>(null);
+  const [operation, setOperation] = useState<string | null>(null);
+  const [planStep, setPlanStep] = useState<"entry_price" | "stop_loss" | "take_profit" | null>(null);
+
+  const beginOperation = (name: string) => {
+    if (operationRef.current) return false;
+    operationRef.current = name; setOperation(name); return true;
+  };
+  const endOperation = () => { operationRef.current = null; setOperation(null); };
 
   const change = (edit: (draft: Annotation) => Annotation) => setAnnotation((draft) => {
     if (!draft) return draft;
@@ -62,8 +74,12 @@ function App() {
       (key, price) => editable && change((item) => ({ ...item, trade_plan: item.trade_plan ? { ...item.trade_plan, [key]: price } : item.trade_plan })),
     );
   };
-  const reload = async (current: Session, tf = timeframe) => {
-    const candles = await rows(current, tf); await apply(candles); restore(annotation, tf);
+  const reload = async (current: Session, tf = timeframe, internal = false) => {
+    if (operationRef.current && !internal) return;
+    const version = ++requestVersionRef.current;
+    const candles = await rows(current, tf);
+    if (version !== requestVersionRef.current) return;
+    await apply(candles); if (version !== requestVersionRef.current) return; restore(annotation, tf);
     setStatus(`${tf.toUpperCase()} · ${candles.length} closed candles · future data hidden`);
   };
 
@@ -73,18 +89,19 @@ function App() {
     if (!id) return;
     api<Session>(`/sessions/${id}`).then((saved) => {
       const stored = localStorage.getItem(draftStorageKey(saved.session_id));
-      let draft = blank(saved);
+      let draft = blank(saved), selected = false, lockedAt: number | null = null;
       try {
-        const parsed = stored ? JSON.parse(stored) as Annotation : null;
-        if (parsed?.session_id === saved.session_id) draft = parsed;
-      } catch { localStorage.removeItem(draftStorageKey(saved.session_id)); }
-      setSession(saved); setSymbol(saved.symbol); setAnnotation(draft);
+        const normalized = stored ? normalizeStoredDraft(JSON.parse(stored), saved) : null;
+        if (normalized) { draft = normalized.annotation; selected = normalized.decisionSelected; lockedAt = normalized.decisionLockedAt; }
+        else if (stored) { localStorage.removeItem(draftStorageKey(saved.session_id)); setStatus("Saved draft was incompatible and was cleared."); }
+      } catch { localStorage.removeItem(draftStorageKey(saved.session_id)); setStatus("Saved draft was corrupt and was cleared."); }
+      setSession(saved); setSymbol(saved.symbol); setAnnotation(draft); setDecisionSelected(selected); setDecisionLockedAt(lockedAt);
     }).catch(() => localStorage.removeItem("annotator-session"));
   }, []);
   useEffect(() => {
     if (session && annotation?.session_id === session.session_id)
-      localStorage.setItem(draftStorageKey(session.session_id), JSON.stringify(annotation));
-  }, [annotation, session?.session_id]);
+      localStorage.setItem(draftStorageKey(session.session_id), JSON.stringify({ annotation, decisionSelected, decisionLockedAt }));
+  }, [annotation, decisionLockedAt, decisionSelected, session?.session_id]);
   useEffect(() => {
     if (!session || !element.current) return;
     const adapter = new KLineChartAdapter(element.current); chart.current = adapter;
@@ -95,7 +112,7 @@ function App() {
   useEffect(() => { if (session) void api<Trade[]>(`/sessions/${session.session_id}/trades`).then(setTrades); }, [session?.session_id]);
 
   const activate = async (created: Session, message?: string) => {
-    setSession(created); setAnnotation(blank(created)); setHistory([]); setRedo([]); setTrades([]);
+    setSession(created); setAnnotation(blank(created)); setHistory([]); setRedo([]); setTrades([]); setDecisionSelected(false); setDecisionLockedAt(null); setPlanStep(null);
     localStorage.setItem("annotator-session", created.session_id);
     if (message) setStatus(message);
   };
@@ -111,7 +128,11 @@ function App() {
       await activate(await api<Session>("/sessions", { method: "POST", body: JSON.stringify({ symbol, start_time: startTime, mode, selection_mode: mode === "reconstruct_real_trade" ? "reconstruct" : "bot_review" }) }), mode === "reconstruct_real_trade" ? "Reconstruction starts before the selected entry." : "Bot-review replay started; bot geometry remains separate.");
     } catch (error) { setStatus(String(error)); }
   };
-  const advance = async (count: number) => { if (!session) return; try { const next = await api<Session>(`/sessions/${session.session_id}/advance`, { method: "POST", body: JSON.stringify({ count }) }); setSession(next); setAnnotation((draft) => draft ? { ...draft, decision_time: next.replay_time } : draft); await reload(next); setTrades(await api<Trade[]>(`/sessions/${next.session_id}/trades`)); } catch (error) { setStatus(String(error)); } };
+  const advance = async (count: number) => {
+    if (!session || decisionSelected || !beginOperation("advance")) return;
+    try { const next = await api<Session>(`/sessions/${session.session_id}/advance`, { method: "POST", body: JSON.stringify({ count }) }); setSession(next); setAnnotation((draft) => draft ? { ...draft, decision_time: next.replay_time } : draft); await reload(next, timeframe, true); setTrades(await api<Trade[]>(`/sessions/${next.session_id}/trades`)); }
+    catch (error) { setStatus(String(error)); } finally { endOperation(); }
+  };
   const triangle = () => chart.current?.drawTriangle(snap, (vertices) => {
     const structure = createTriangle(crypto.randomUUID(), timeframe, roleFor(timeframe), vertices, snap);
     if (new URLSearchParams(window.location.search).has("triangleTrace"))
@@ -120,23 +141,62 @@ function App() {
   });
   const trendline = () => chart.current?.drawTrendline(snap, (p1, p2) => change((draft) => ({ ...draft, trendlines: [...draft.trendlines, createTrendline(crypto.randomUUID(), timeframe, p1, p2, snap)] })));
   const strongPoint = () => chart.current?.drawStrongPoint(snap, (point) => change((draft) => ({ ...draft, strong_points: [...draft.strong_points, createStrongPoint(crypto.randomUUID(), timeframe, point, snap)] })));
-  const plan = (key: keyof TradePlan) => chart.current?.drawHorizontal(key, snap, (point) => change((draft) => ({ ...draft, trade_plan: { entry_price: draft.trade_plan?.entry_price ?? point.price, stop_loss: draft.trade_plan?.stop_loss ?? point.price, take_profit: draft.trade_plan?.take_profit ?? point.price, [key]: point.price } })));
+  const plan = (key: "entry_price" | "stop_loss" | "take_profit", guided = false) => {
+    setPlanStep(key);
+    chart.current?.drawHorizontal(key, snap, (point) => {
+      change((draft) => ({ ...draft, trade_plan: { entry_price: draft.trade_plan?.entry_price ?? point.price, stop_loss: draft.trade_plan?.stop_loss ?? point.price, take_profit: draft.trade_plan?.take_profit ?? point.price, [key]: point.price } }));
+      const next = key === "entry_price" ? "stop_loss" : key === "stop_loss" ? "take_profit" : null;
+      if (guided && next) { setPlanStep(next); setStatus(next === "stop_loss" ? "Place Stop" : "Place Target"); window.setTimeout(() => plan(next, true), 0); }
+      else { setPlanStep(null); setStatus(guided ? "Trade plan complete — drag any line to refine" : `Place ${key === "entry_price" ? "Entry" : key === "stop_loss" ? "Stop" : "Target"}`); }
+    });
+  };
   const undo = () => { const previous = history.at(-1); if (!previous) return; setHistory((items) => items.slice(0, -1)); if (annotation) setRedo((items) => [...items, annotation]); setAnnotation(previous); };
   const redoAction = () => { const next = redo.at(-1); if (!next) return; setRedo((items) => items.slice(0, -1)); if (annotation) setHistory((items) => [...items, annotation]); setAnnotation(next); };
-  const reset = () => { if (!session || !annotation) return; if ((annotation.structures.length || annotation.trendlines.length || annotation.strong_points.length || annotation.levels.length || annotation.trade_plan) && !window.confirm("Clear only this unrecorded setup?")) return; setAnnotation(blank(session)); setHistory([]); setRedo([]); };
+  const reset = () => { if (!session || !annotation) return; if ((annotation.structures.length || annotation.trendlines.length || annotation.strong_points.length || annotation.levels.length || annotation.trade_plan) && !window.confirm("Clear only this unrecorded setup?")) return; setAnnotation(blank(session)); setHistory([]); setRedo([]); setDecisionSelected(false); setDecisionLockedAt(null); setPlanStep(null); };
   const capture = async () => {
     if (!session || !annotation || !chart.current) throw new Error("Chart is not ready for screenshot capture.");
     const screenshots: Record<string, string> = {};
     for (const tf of timeframes) { await apply(await rows(session, tf)); restore(annotation, tf, false); const image = await chart.current.snapshotAfterRender(); if (!image) throw new Error(`Unable to capture ${tf} screenshot.`); screenshots[tf] = image; }
-    await reload(session, timeframe); return screenshots;
+    await reload(session, timeframe, true); return screenshots;
   };
-  const record = async () => { if (!session || !annotation) return; try { const screenshots = await capture(); const saved = await api<Annotation>("/annotations/record", { method: "POST", body: JSON.stringify({ annotation: { ...annotation, decision_time: session.replay_time }, screenshots, place_trade: annotation.market_state === "trade" }) }); localStorage.removeItem(draftStorageKey(session.session_id)); setAnnotation(blank(session)); setHistory([]); setRedo([]); setTrades(await api<Trade[]>(`/sessions/${session.session_id}/trades`)); setStatus(saved.market_state === "trade" ? "Decision recorded and simulated trade placed. A clean draft is ready." : "Decision recorded. A clean draft is ready."); } catch (error) { setStatus(`Record failed — draft kept intact: ${String(error)}`); } };
+  const record = async () => {
+    if (!session || !annotation || !decisionSelected || decisionLockedAt === null || !beginOperation("record")) return;
+    if (annotation.market_state === "trade" && !planIsDirectional(annotation)) { endOperation(); setStatus("Trade plan must be LONG Stop < Entry < Target or SHORT Target < Entry < Stop."); return; }
+    try { const screenshots = await capture(); const saved = await api<Annotation>("/annotations/record", { method: "POST", body: JSON.stringify({ annotation: { ...annotation, decision_time: decisionLockedAt }, screenshots, place_trade: annotation.market_state === "trade" }) }); localStorage.removeItem(draftStorageKey(session.session_id)); setAnnotation(blank(session)); setHistory([]); setRedo([]); setDecisionSelected(false); setDecisionLockedAt(null); setPlanStep(null); setTrades(await api<Trade[]>(`/sessions/${session.session_id}/trades`)); setStatus(saved.market_state === "trade" ? "Decision recorded and simulated trade placed. A clean draft is ready." : "Decision recorded. A clean draft is ready."); }
+    catch (error) { setStatus(`Record failed — draft kept intact: ${String(error)}`); } finally { endOperation(); }
+  };
+  const selectDecision = (state: Annotation["market_state"]) => {
+    if (!session) return;
+    change((draft) => withMarketState(draft, state)); setDecisionSelected(true); setDecisionLockedAt(session.replay_time);
+  };
+  const manualExit = async (trade: Trade) => {
+    if (!session || !beginOperation("manual-exit")) return;
+    try { const candles = await rows(session, "15m"); const close = candles.at(-1)?.close; if (typeof close !== "number") throw new Error("No visible 15M close is available."); const updated = await api<Trade>(`/trades/${trade.simulated_trade_id}/manual-exit`, { method: "POST", body: JSON.stringify({ price: close, timestamp: session.replay_time }) }); setTrades((items) => items.map((item) => item.simulated_trade_id === updated.simulated_trade_id ? updated : item)); }
+    catch (error) { setStatus(String(error)); } finally { endOperation(); }
+  };
   const metrics = useMemo(() => annotation?.trade_plan ? { risk: Math.abs(annotation.trade_plan.entry_price - annotation.trade_plan.stop_loss), reward: Math.abs(annotation.trade_plan.take_profit - annotation.trade_plan.entry_price) } : null, [annotation]);
-  useEffect(() => { const key = (event: KeyboardEvent) => { if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return; if (event.key === "ArrowRight") void advance(event.shiftKey ? 5 : 1); if (event.key.toLowerCase() === "t") triangle(); if (event.key.toLowerCase() === "l") trendline(); if (event.key.toLowerCase() === "o") strongPoint(); if (event.key.toLowerCase() === "e") plan("entry_price"); if (event.key.toLowerCase() === "s") plan("stop_loss"); if (event.key.toLowerCase() === "p") plan("take_profit"); if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") event.shiftKey ? redoAction() : undo(); if (event.key === "Enter") void record(); if (["1", "2", "3", "4", "5"].includes(event.key)) change((draft) => ({ ...draft, confidence: Number(event.key) })); }; addEventListener("keydown", key); return () => removeEventListener("keydown", key); });
+  useEffect(() => { const key = (event: KeyboardEvent) => { if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return; if (event.key === "ArrowRight" && !decisionSelected && !operationRef.current) void advance(event.shiftKey ? 5 : 1); if (event.key.toLowerCase() === "t") triangle(); if (event.key.toLowerCase() === "l") trendline(); if (event.key.toLowerCase() === "o") strongPoint(); if (event.key.toLowerCase() === "e") plan("entry_price"); if (event.key.toLowerCase() === "s") plan("stop_loss"); if (event.key.toLowerCase() === "p") plan("take_profit"); if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") event.shiftKey ? redoAction() : undo(); if (event.key === "Enter" && !operationRef.current) void record(); if (["1", "2", "3", "4", "5"].includes(event.key)) change((draft) => ({ ...draft, confidence: Number(event.key) })); }; addEventListener("keydown", key); return () => removeEventListener("keydown", key); });
 
   const helpText = <><p><b>4H</b> macro parent · <b>1H</b> local parent · <b>15M</b> entry structure. Draw the triangle, trendlines, and strong points that genuinely matter.</p><p><b>Nothing here</b>: no meaningful tradable setup. <b>Valid setup — Skip</b>: real structure, no trade. <b>Maybe</b>: plausible but not convincing. <b>Trade</b>: you would actually take it.</p><p>Shortcuts: → next · Shift+→ +5 · T triangle · L trendline · O strong point · E/S/P plan · 1–5 confidence · Cmd/Ctrl+Z undo · Enter record.</p></>;
   if (!session) return <main className="start"><header><div className="brand">REPLAY <i>01</i></div><div className="live">LOCAL · BLIND HISTORICAL REPLAY</div><button onClick={() => setHelp(true)}>? HELP</button></header><section className="start-card"><h1>START NEW REPLAY</h1><label>Market<select value={symbol} onChange={(event) => setSymbol(event.target.value)}><option>BTC</option><option>ETH</option><option>SOL</option></select></label><button className="commit" onClick={() => void start("random")}>START RANDOM REPLAY</button><p>Random Replay is recommended for collecting human training examples. Future candles remain hidden.</p><div className="or">or</div><label>Historical date/time<input type="datetime-local" value={chosenTime} onChange={(event) => setChosenTime(event.target.value)} min={range ? dateInput(range.earliest_valid) : undefined} max={range ? dateInput(range.latest_valid) : undefined} /></label><button onClick={() => void start("chosen_date")}>START AT DATE</button>{range && <small>Available replay range: {new Date(range.earliest_valid).toLocaleString()} → {new Date(range.latest_valid).toLocaleString()}<br />Includes {range.pre_roll_candles} closed 4H candles of pre-roll.</small>}<p>{status}</p></section>{tutorial && <Tutorial step={tutorialStep} next={() => tutorialStep < 4 ? setTutorialStep(tutorialStep + 1) : (localStorage.setItem("annotator-tutorial-seen", "true"), setTutorial(false))} />}{help && <Modal close={() => setHelp(false)}>{helpText}</Modal>}</main>;
-  return <main><header><div className="brand">REPLAY <i>01</i></div><div className="live">HISTORICAL REPLAY · {new Date(session.replay_time).toLocaleString()}</div><button onClick={() => setHelp(true)}>? HELP</button><ResearchTools symbol={symbol} actualTrades={actualTrades} candidates={candidates} setActualTrades={setActualTrades} setCandidates={setCandidates} startResearch={startResearch} setStatus={setStatus} /></header><section className="toolbar">{timeframes.map((tf) => <button key={tf} className={timeframe === tf ? "active" : ""} onClick={() => { setTimeframe(tf); void reload(session, tf); }}>{tf.toUpperCase()}</button>)}<span /><button onClick={() => void advance(1)}>NEXT →</button><button onClick={() => void advance(5)}>+5</button></section><section className="workspace"><div className="chart"><div ref={element} className="chart-canvas" /><p>{status}</p></div><aside><h2>CURRENT SETUP</h2><div className="decisions">{([ ["no_structure", "NOTHING HERE"], ["valid_triangle_no_trade", "VALID SETUP — SKIP"], ["maybe_setup", "MAYBE"], ["trade", "TRADE"] ] as const).map(([value, label]) => <button key={value} className={annotation?.market_state === value ? "selected" : ""} onClick={() => change((draft) => withMarketState(draft, value))}>{label}</button>)}</div><div className="direction"><button className={annotation?.side === "long" ? "selected" : ""} onClick={() => change((draft) => ({ ...draft, side: "long" }))}>LONG</button><button className={annotation?.side === "short" ? "selected" : ""} onClick={() => change((draft) => ({ ...draft, side: "short" }))}>SHORT</button></div><label>Confidence<div className="confidence">{[1,2,3,4,5].map((value) => <button key={value} className={annotation?.confidence === value ? "selected" : ""} onClick={() => change((draft) => ({ ...draft, confidence: value }))}>{value}</button>)}</div></label>{annotation?.side && <button onClick={() => { plan("entry_price"); setStatus("Place Entry, then Stop, then Target. Drag any line to refine it."); }}>PLACE TRADE PLAN</button>}{metrics && <small>Entry {annotation?.trade_plan?.entry_price.toFixed(2)}<br />Stop {annotation?.trade_plan?.stop_loss.toFixed(2)}<br />Target {annotation?.trade_plan?.take_profit.toFixed(2)}<br />Risk {(metrics.risk / (annotation?.trade_plan?.entry_price || 1) * 100).toFixed(2)}% · Reward {(metrics.reward / (annotation?.trade_plan?.entry_price || 1) * 100).toFixed(2)}% · R:R {(metrics.reward / metrics.risk).toFixed(2)}</small>}<button className="commit" onClick={() => void record()}>{annotation?.market_state === "trade" ? "RECORD & PLACE TRADE" : "RECORD & CONTINUE"}</button><small>Session<br />Trades: {trades.length} · outcomes stay out of capture view</small></aside></section><section className="drawing-toolbar"><button onClick={triangle}>△ TRIANGLE</button><button onClick={trendline}>╱ TRENDLINE</button><button onClick={strongPoint}>● STRONG POINT</button><select value={snap} onChange={(event) => setSnap(event.target.value as typeof snap)}><option value="free">Free draw</option><option value="weak">Weak snap</option><option value="strong">Strong snap</option></select><button onClick={undo}>UNDO</button><button onClick={redoAction}>REDO</button><button onClick={reset}>RESET CURRENT SETUP</button></section>{help && <Modal close={() => setHelp(false)}>{helpText}</Modal>}</main>;
+  const busy = operation !== null;
+  const locked = decisionSelected || busy;
+  return <main>
+    <header><div className="brand">REPLAY <i>01</i></div><div className="live">HISTORICAL REPLAY · {new Date(session.replay_time).toLocaleString()}</div><button onClick={() => setHelp(true)}>? HELP</button><ResearchTools symbol={symbol} actualTrades={actualTrades} candidates={candidates} setActualTrades={setActualTrades} setCandidates={setCandidates} startResearch={startResearch} setStatus={setStatus} /></header>
+    <section className="toolbar">{timeframes.map((tf) => <button key={tf} disabled={busy} className={timeframe === tf ? "active" : ""} onClick={() => { setTimeframe(tf); void reload(session, tf); }}>{tf.toUpperCase()}</button>)}<span /><button disabled={locked} onClick={() => void advance(1)}>NEXT →</button><button disabled={locked} onClick={() => void advance(5)}>+5</button></section>
+    <section className="workspace"><div className="chart"><div ref={element} className="chart-canvas" /><p>{status}</p></div><aside>
+      <h2>CURRENT SETUP</h2>
+      <p className="decision-state">{decisionSelected ? `DECISION LOCKED · ${new Date(decisionLockedAt!).toLocaleString()}` : "NO DECISION SELECTED"}</p>
+      <div className="decisions">{([ ["no_structure", "NOTHING HERE"], ["valid_triangle_no_trade", "VALID SETUP — SKIP"], ["maybe_setup", "MAYBE"], ["trade", "TRADE"] ] as const).map(([value, label]) => <button key={value} className={decisionSelected && annotation?.market_state === value ? "selected" : ""} onClick={() => selectDecision(value)}>{label}</button>)}</div>
+      <div className="direction"><button className={annotation?.side === "long" ? "selected" : ""} onClick={() => change((draft) => ({ ...draft, side: "long" }))}>LONG</button><button className={annotation?.side === "short" ? "selected" : ""} onClick={() => change((draft) => ({ ...draft, side: "short" }))}>SHORT</button></div>
+      <label>Confidence<div className="confidence">{[1,2,3,4,5].map((value) => <button key={value} className={annotation?.confidence === value ? "selected" : ""} onClick={() => change((draft) => ({ ...draft, confidence: value }))}>{value}</button>)}</div></label>
+      {annotation?.side && <><button onClick={() => { setStatus("Place Entry"); plan("entry_price", true); }}>PLACE TRADE PLAN</button><div className="plan-actions"><button className={planStep === "entry_price" ? "active" : ""} onClick={() => plan("entry_price")}>ENTRY</button><button className={planStep === "stop_loss" ? "active" : ""} onClick={() => plan("stop_loss")}>STOP</button><button className={planStep === "take_profit" ? "active" : ""} onClick={() => plan("take_profit")}>TARGET</button></div></>}
+      {metrics && <small>Entry {annotation?.trade_plan?.entry_price.toFixed(2)}<br />Stop {annotation?.trade_plan?.stop_loss.toFixed(2)}<br />Target {annotation?.trade_plan?.take_profit.toFixed(2)}<br />Risk {(metrics.risk / (annotation?.trade_plan?.entry_price || 1) * 100).toFixed(2)}% · Reward {(metrics.reward / (annotation?.trade_plan?.entry_price || 1) * 100).toFixed(2)}% · R:R {(metrics.reward / metrics.risk).toFixed(2)}</small>}
+      <button className="commit" disabled={busy || !decisionSelected} onClick={() => void record()}>{annotation?.market_state === "trade" ? "RECORD & PLACE TRADE" : "RECORD & CONTINUE"}</button>
+      <section className="active-trades">{trades.map((trade) => <div key={trade.simulated_trade_id}><b>{trade.symbol} {trade.side.toUpperCase()} · {trade.status.toUpperCase()}</b><small>Entry {trade.entry_price} · Stop {trade.stop_loss} · Target {trade.take_profit}</small>{trade.status === "open" && <button disabled={busy} onClick={() => void manualExit(trade)}>MANUAL EXIT AT CURRENT CLOSE</button>}</div>)}</section>
+    </aside></section>
+    <section className="drawing-toolbar"><button onClick={triangle}>△ TRIANGLE</button><button onClick={trendline}>╱ TRENDLINE</button><button onClick={strongPoint}>● STRONG POINT</button><select value={snap} onChange={(event) => setSnap(event.target.value as typeof snap)}><option value="free">Free draw</option><option value="weak">Weak snap</option><option value="strong">Strong snap</option></select><button onClick={undo}>UNDO</button><button onClick={redoAction}>REDO</button><button onClick={reset}>RESET CURRENT SETUP</button></section>{help && <Modal close={() => setHelp(false)}>{helpText}</Modal>}
+  </main>;
 }
 
 function ResearchTools({ symbol, actualTrades, candidates, setActualTrades, setCandidates, startResearch, setStatus }: { symbol: string; actualTrades: ActualTrade[]; candidates: Candidate[]; setActualTrades: (items: ActualTrade[]) => void; setCandidates: (items: Candidate[]) => void; startResearch: (mode: "reconstruct_real_trade" | "review_bot_candidate", time: number) => Promise<void>; setStatus: (value: string) => void }) { return <details><summary>RESEARCH TOOLS</summary><p>Secondary only: never use these for blind Batch 1 capture.</p><button onClick={() => void api<ActualTrade[]>(`/actual-trades?symbol=${symbol}`).then(setActualTrades).catch((error) => setStatus(String(error)))}>LOAD REAL TRADES</button>{actualTrades.map((trade) => <button key={trade.trade_id} onClick={() => void startResearch("reconstruct_real_trade", trade.entry_time)}>RECONSTRUCT {trade.trade_id} · {new Date(trade.entry_time).toLocaleString()} · {trade.side}</button>)}<button onClick={() => void api<Candidate[]>(`/bot-candidates?symbol=${symbol}&limit=25`).then(setCandidates).catch((error) => setStatus(String(error)))}>LOAD BOT CANDIDATES</button>{candidates.map((candidate, index) => <button key={`${candidate.decision_time}-${index}`} onClick={() => void startResearch("review_bot_candidate", candidate.decision_time)}>REVIEW {new Date(candidate.decision_time).toLocaleString()} · {candidate.side}</button>)}</details>; }

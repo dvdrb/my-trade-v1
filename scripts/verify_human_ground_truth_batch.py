@@ -5,7 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from app.annotation.models import HumanAnnotation, SUPPORTED_SCHEMA_VERSIONS, SimulatedTrade
+from app.annotation.models import HumanAnnotation, MarketState, SUPPORTED_SCHEMA_VERSIONS, SimulatedTrade
 
 
 def digest(path: Path) -> str:
@@ -25,14 +25,31 @@ def verify(batch: Path) -> list[str]:
     ids = [annotation.annotation_id for annotation in annotations]
     if len(ids) != len(set(ids)):
         errors.append("annotation IDs are not unique")
-    known = set(ids)
-    if any(trade.annotation_id not in known for trade in trades):
-        errors.append("a simulated trade references an unknown annotation")
+    known = {annotation.annotation_id: annotation for annotation in annotations}
+    by_annotation: dict[str, list[SimulatedTrade]] = {}
+    for trade in trades:
+        by_annotation.setdefault(trade.annotation_id, []).append(trade)
+        annotation = known.get(trade.annotation_id)
+        if annotation is None:
+            errors.append("a simulated trade references an unknown annotation")
+            continue
+        if (trade.session_id != annotation.session_id or trade.symbol != annotation.symbol
+                or trade.side != annotation.side):
+            errors.append(f"trade {trade.simulated_trade_id} does not match its annotation identity")
+        plan = annotation.trade_plan
+        if plan is None or (trade.entry_price, trade.stop_loss, trade.take_profit) != (plan.entry_price, plan.stop_loss, plan.take_profit):
+            errors.append(f"trade {trade.simulated_trade_id} does not match its annotation plan")
+        if trade.created_at_market_time != annotation.decision_time:
+            errors.append(f"trade {trade.simulated_trade_id} has the wrong market creation time")
     if manifest.get("annotation_count") != len(annotations) or manifest.get("trade_count") != len(trades):
         errors.append("manifest counts do not match exported records")
     required_timeframes = {"4h", "1h", "15m"}
     canonical_revisions = manifest.get("canonical_annotation_revisions", {})
     for annotation in annotations:
+        annotation_trades = by_annotation.get(annotation.annotation_id, [])
+        expected_count = 1 if annotation.market_state == MarketState.TRADE else 0
+        if len(annotation_trades) != expected_count:
+            errors.append(f"annotation {annotation.annotation_id} requires exactly {expected_count} simulated trade(s)")
         if annotation.decision_time < 0:
             errors.append("annotation has an invalid decision timestamp")
         trendline_ids = [trendline.trendline_id for trendline in annotation.trendlines]
@@ -59,11 +76,27 @@ def verify(batch: Path) -> list[str]:
                 f"annotation {annotation.annotation_id} canonical screenshots must be exactly "
                 f"{sorted(required_timeframes)}, found {sorted(actual_timeframes)}"
             )
+    expected_artifacts = {"manifest.json", "annotations.jsonl", "simulated_trades.jsonl"}
+    expected_artifacts.update(str(path.relative_to(batch)) for path in batch.glob("screenshots/**/*.png"))
+    checksum_entries: dict[str, str] = {}
     for line in sums_path.read_text(encoding="utf-8").splitlines():
-        expected, relative = line.split("  ", 1)
+        try:
+            expected, relative = line.split("  ", 1)
+        except ValueError:
+            errors.append("invalid checksum entry")
+            continue
+        if relative in checksum_entries:
+            errors.append(f"duplicate checksum entry: {relative}")
+            continue
+        checksum_entries[relative] = expected
         path = batch / relative
         if not path.is_file() or digest(path) != expected:
             errors.append(f"checksum mismatch: {relative}")
+    if set(checksum_entries) != expected_artifacts:
+        errors.append("SHA256SUMS does not contain exactly the frozen batch artifacts")
+    actual_artifacts = {str(path.relative_to(batch)) for path in batch.rglob("*") if path.is_file() and path.name != "SHA256SUMS"}
+    if actual_artifacts != expected_artifacts:
+        errors.append("batch contains unexpected or missing mutable artifacts")
     return errors
 
 

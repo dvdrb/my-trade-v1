@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.annotation.models import BotCandidateReview, CommitRequest, HumanAnnotation, ReplaySession, ScreenshotRequest, SimulatedTrade, TriangleGeometry
-from app.annotation.replay import advance_time, step_trade, visible_candles
+from app.annotation.replay import advance_time, candle_knowledge_time, step_trade, visible_candles
 from app.annotation.research_range import allowed_replay_range, choose_random_replay, human_research_bounds
 from app.annotation.repository import AnnotationRepository
 from app.annotation.triangle_adapter import geometry_points
@@ -81,9 +81,16 @@ def create_app(db_path: str | Path = "data/bot.sqlite3", *, research_periods_pat
                     raise HTTPException(422, "structure point is in the future")
         # Human trendlines may project into the blank part of the chart. They are
         # trader-created geometry, not future market observations.
+        _, candle_repo = repos()
         for strong_point in annotation.strong_points:
-            if strong_point.point.timestamp > session.replay_time:
-                raise HTTPException(422, "strong point is in the future")
+            visible_opens = {
+                candle.open_time
+                for candle in visible_candles(
+                    candle_repo.all(session.symbol, strong_point.timeframe), session.replay_time,
+                )
+            }
+            if strong_point.point.timestamp not in visible_opens:
+                raise HTTPException(422, "strong point must reference a visible candle in its timeframe")
         for level in annotation.levels:
             for point in (level.start, level.end):
                 if point is not None and point.timestamp > session.replay_time:
@@ -133,20 +140,29 @@ def create_app(db_path: str | Path = "data/bot.sqlite3", *, research_periods_pat
             raise HTTPException(422, "there is no locally stored 15m candle history for this market")
         interval = replay_range(request.symbol)
         if request.selection_mode == "random":
-            selected = choose_random_replay(interval, base)
+            replay_time = choose_random_replay(interval, base)
         else:
             if request.start_time is None:
                 raise HTTPException(422, "choose a historical date/time or start a random replay")
             selected = request.start_time
-        if selected < interval.earliest or selected > interval.latest:
-            raise HTTPException(422, "selected time is outside the approved replay range or lacks required pre-roll")
-        initial = max((candle for candle in base if candle.open_time <= selected), key=lambda candle: candle.open_time)
-        replay_time = initial.close_time if initial.close_time is not None else initial.open_time
+            eligible = [
+                candle_knowledge_time(candle)
+                for candle in base
+                if interval.earliest <= candle_knowledge_time(candle) <= interval.latest
+                and candle_knowledge_time(candle) <= selected
+            ]
+            if not eligible:
+                raise HTTPException(422, "selected time is outside the approved replay range or lacks required pre-roll")
+            replay_time = max(eligible)
+        if not interval.earliest <= replay_time <= interval.latest:
+            raise HTTPException(422, "resolved replay time is outside the approved replay range")
         if request.mode == "reconstruct_real_trade":
-            prior = [candle.open_time for candle in base if candle.open_time < selected]
+            prior = [candle_knowledge_time(candle) for candle in base if candle_knowledge_time(candle) < replay_time]
             if not prior:
                 raise HTTPException(422, "there is no candle before this real trade entry")
             replay_time = prior[-1]
+            if not interval.earliest <= replay_time <= interval.latest:
+                raise HTTPException(422, "reconstruction start is outside the approved replay range")
         return annotations.create_session(ReplaySession(symbol=request.symbol, started_at_market_time=replay_time,
                                                          replay_time=replay_time, mode=request.mode,
                                                          selection_mode=request.selection_mode,
@@ -163,11 +179,15 @@ def create_app(db_path: str | Path = "data/bot.sqlite3", *, research_periods_pat
         annotations, candles = repos(); session = annotations.get_session(session_id)
         if session is None: raise HTTPException(404, "session not found")
         all_candles = candles.all(session.symbol, "15m")
-        new_time = min(advance_time(all_candles, session.replay_time, request.count), replay_range(session.symbol).latest)
+        interval = replay_range(session.symbol)
+        candidate = advance_time(all_candles, session.replay_time, request.count)
+        # Do not clamp an attempted advance down to an earlier timestamp at the
+        # range edge. Holding position preserves replay-time monotonicity.
+        new_time = candidate if session.replay_time <= candidate <= interval.latest else session.replay_time
         for trade in annotations.trades(session_id):
             if trade.status in {"pending", "open"}:
                 state = trade.model_dump()
-                for candle in (c for c in all_candles if session.replay_time < c.open_time <= new_time):
+                for candle in (c for c in all_candles if session.replay_time < candle_knowledge_time(c) <= new_time):
                     state = step_trade(state, candle)
                     if state["status"] not in {"pending", "open"}: break
                 annotations.save_trade(SimulatedTrade.model_validate(state))

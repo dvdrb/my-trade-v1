@@ -36,6 +36,11 @@ class AnnotationRepository:
         return [_session(row) for row in self.connection.execute("SELECT * FROM replay_sessions ORDER BY updated_at DESC")]
 
     def update_session_time(self, session_id: str, replay_time: int) -> ReplaySession:
+        current = self.get_session(session_id)
+        if current is None:
+            raise KeyError(f"unknown replay session {session_id}")
+        if replay_time < current.replay_time:
+            raise ValueError("replay time cannot move backwards")
         self.connection.execute("UPDATE replay_sessions SET replay_time = ?, updated_at = ? WHERE session_id = ?",
                                 (replay_time, _now(), session_id))
         self.connection.commit()

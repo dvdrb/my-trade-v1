@@ -1,5 +1,42 @@
 import type { Annotation, HumanTrendline, Point, StrongPoint, Timeframe, Triangle, TriangleGeometry } from "./types";
 
+export type DraftSession = { session_id: string; symbol: string; replay_time: number };
+export type StoredDraft = { annotation: Annotation; decisionSelected: boolean; decisionLockedAt: number | null };
+
+/** Restore only local state that cannot silently change an already chosen decision. */
+export const normalizeStoredDraft = (value: unknown, session: DraftSession): StoredDraft | null => {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Partial<StoredDraft> & Partial<Annotation>;
+  const raw = record.annotation && typeof record.annotation === "object" ? record.annotation : record;
+  if (raw.session_id !== session.session_id || raw.symbol !== session.symbol) return null;
+  const decisionSelected = record.decisionSelected === true;
+  const decisionLockedAt = record.decisionLockedAt ?? null;
+  if (decisionSelected && decisionLockedAt !== session.replay_time) return null;
+  if (!decisionSelected && decisionLockedAt !== null) return null;
+  if (!raw.annotation_id || typeof raw.market_state !== "string") return null;
+  return {
+    annotation: {
+      ...raw as Annotation,
+      decision_time: session.replay_time,
+      structures: Array.isArray(raw.structures) ? raw.structures : [],
+      trendlines: Array.isArray(raw.trendlines) ? raw.trendlines : [],
+      strong_points: Array.isArray(raw.strong_points) ? raw.strong_points : [],
+      levels: Array.isArray(raw.levels) ? raw.levels : [],
+      notes: typeof raw.notes === "string" ? raw.notes : "",
+    },
+    decisionSelected,
+    decisionLockedAt: decisionSelected ? decisionLockedAt : null,
+  };
+};
+
+export const planIsDirectional = (draft: Annotation): boolean => {
+  const plan = draft.trade_plan;
+  if (!plan || !draft.side) return false;
+  return draft.side === "long"
+    ? plan.stop_loss < plan.entry_price && plan.entry_price < plan.take_profit
+    : plan.take_profit < plan.entry_price && plan.entry_price < plan.stop_loss;
+};
+
 export const forTimeframe = (draft: Annotation, timeframe: Timeframe): Annotation => ({
   ...draft,
   structures: draft.structures.filter((item) => item.timeframe === timeframe),

@@ -149,7 +149,7 @@ class TradePlan(BaseModel):
 
 
 class HumanAnnotation(BaseModel):
-    schema_version: str = SCHEMA_VERSION
+    schema_version: Literal["human-ground-truth-v1", "human-ground-truth-v2", "human-ground-truth-v3"] = SCHEMA_VERSION
     annotation_id: str = Field(default_factory=lambda: str(uuid4()))
     session_id: str
     symbol: str

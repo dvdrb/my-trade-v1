@@ -6,17 +6,22 @@ from app.core.types import Candle
 TIMEFRAME_MS = {"15m": 15 * 60_000, "1h": 60 * 60_000, "4h": 4 * 60 * 60_000}
 
 
+def candle_knowledge_time(candle: Candle) -> int:
+    """The point at which this OHLC bucket is fully observable."""
+    return candle.close_time if candle.close_time is not None else candle.open_time
+
+
 def visible_candles(candles: list[Candle], replay_time: int) -> list[Candle]:
     """Return only fully knowable candles at the replay point.
 
     Aggregated 1h/4h OHLC values are future information until their close.  Sources
     without a close_time are treated as already-finalized legacy rows.
     """
-    return [candle for candle in candles if candle.open_time <= replay_time and (candle.close_time is None or candle.close_time <= replay_time)]
+    return [candle for candle in candles if candle_knowledge_time(candle) <= replay_time]
 
 
 def advance_time(candles: list[Candle], replay_time: int, count: int = 1) -> int:
-    known = [candle.close_time if candle.close_time is not None else candle.open_time for candle in candles if (candle.close_time if candle.close_time is not None else candle.open_time) > replay_time]
+    known = [candle_knowledge_time(candle) for candle in candles if candle_knowledge_time(candle) > replay_time]
     return known[min(count - 1, len(known) - 1)] if known else replay_time
 
 
@@ -29,7 +34,7 @@ def step_trade(trade: dict[str, object], candle: Candle) -> dict[str, object]:
             trade.update(status="ambiguous")
             return trade
         if candle.low <= entry <= candle.high:
-            trade.update(status="open", entry_time=candle.open_time)
+            trade.update(status="open", entry_time=candle_knowledge_time(candle))
     if trade["status"] != "open":
         return trade
     side, stop, target = str(trade["side"]), float(trade["stop_loss"]), float(trade["take_profit"])
@@ -43,5 +48,5 @@ def step_trade(trade: dict[str, object], candle: Candle) -> dict[str, object]:
         risk = abs(float(trade["entry_price"]) - stop)
         r = (exit_price - float(trade["entry_price"])) / risk
         if side == "short": r *= -1
-        trade.update(status=status, exit_time=candle.open_time, exit_price=exit_price, realized_r=r)
+        trade.update(status=status, exit_time=candle_knowledge_time(candle), exit_price=exit_price, realized_r=r)
     return trade

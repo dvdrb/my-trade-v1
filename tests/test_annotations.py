@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -8,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.annotation.models import HumanAnnotation, HumanSide, HumanTrendline, LegacyTriangleGeometry, MarketState, PricePoint, ReplaySession, SimulatedTrade, StrongPoint, Structure, StructureRole, TrendLine, TriangleGeometry
-from app.annotation.replay import step_trade, visible_candles
+from app.annotation.replay import candle_knowledge_time, step_trade, visible_candles
 from app.annotation.repository import AnnotationRepository
 from app.annotation.research_range import human_research_bounds
 from app.annotation.server import create_app
@@ -33,6 +34,7 @@ def structure(time: int = 1) -> Structure:
 def seeded_client(tmp_path: Path) -> tuple[TestClient, int]:
     db = tmp_path / "replay.sqlite3"; init_db(db)
     candles = [Candle("BTC", "15m", index * 1_000, 100, 101, 99, 100) for index in range(1_000)]
+    candles += [Candle("BTC", "1h", index * 1_000, 100, 101, 99, 100) for index in range(1_000)]
     candles += [Candle("BTC", "4h", index * 4_000, 100, 101, 99, 100) for index in range(300)]
     CandleRepository(connect(db)).insert_many(candles)
     return TestClient(create_app(db, research_bounds=(0, 900_000))), db
@@ -88,7 +90,9 @@ def test_replay_range_enforces_preroll_training_boundary_and_random_selection(tm
     replay_range = client.get("/api/replay-range/BTC").json()
     assert replay_range["earliest_valid"] >= 199 * 4_000
     assert client.post("/api/sessions", json={"symbol": "BTC", "start_time": 1_000, "selection_mode": "chosen_date"}).status_code == 422
-    assert client.post("/api/sessions", json={"symbol": "BTC", "start_time": 950_000, "selection_mode": "chosen_date"}).status_code == 422
+    late = client.post("/api/sessions", json={"symbol": "BTC", "start_time": 950_000, "selection_mode": "chosen_date"})
+    assert late.status_code == 200
+    assert late.json()["replay_time"] == replay_range["latest_valid"]
     random_session = client.post("/api/sessions", json={"symbol": "BTC", "selection_mode": "random"})
     assert random_session.status_code == 200
     assert replay_range["earliest_valid"] <= random_session.json()["replay_time"] <= replay_range["latest_valid"]
@@ -209,6 +213,7 @@ def test_export_and_verify_batch_preserves_unique_annotations(tmp_path: Path) ->
     db = tmp_path / "export.sqlite3"; init_db(db); repository = AnnotationRepository(connect(db))
     session = repository.create_session(ReplaySession(symbol="BTC", started_at_market_time=2, replay_time=2))
     annotation = repository.save_annotation(HumanAnnotation(session_id=session.session_id, symbol="BTC", decision_time=2, market_state=MarketState.TRADE, side=HumanSide.LONG, structures=[structure()], trendlines=[HumanTrendline(trendline_id="line", timeframe="15m", p1=PricePoint(timestamp=1, price=99), p2=PricePoint(timestamp=3, price=101))], strong_points=[StrongPoint(strong_point_id="point", timeframe="1h", point=PricePoint(timestamp=2, price=100))], trade_plan={"entry_price": 100, "stop_loss": 95, "take_profit": 110}))
+    repository.save_trade(SimulatedTrade(annotation_id=annotation.annotation_id, session_id=session.session_id, symbol="BTC", side=HumanSide.LONG, entry_price=100, stop_loss=95, take_profit=110, created_at_market_time=2))
     repository.save_screenshots(annotation.annotation_id, {"4h": b"png", "1h": b"png", "15m": b"png"}, tmp_path / "screenshots")
     output = tmp_path / "batches"
     root = Path(__file__).parents[1]
@@ -221,3 +226,106 @@ def test_export_and_verify_batch_preserves_unique_annotations(tmp_path: Path) ->
     verify = subprocess.run([sys.executable, "scripts/verify_human_ground_truth_batch.py", str(output / "batch_001")], cwd=root, text=True, capture_output=True)
     assert verify.returncode != 0
     assert "canonical screenshots must be exactly" in verify.stderr
+
+
+def exact_time_client(tmp_path: Path) -> tuple[TestClient, list[Candle]]:
+    db = tmp_path / "exact.sqlite3"; init_db(db)
+    ten_am = 1_735_724_000_000  # 2025-01-01T10:00:00Z
+    fifteen = 15 * 60_000
+    base = [Candle("BTC", "15m", ten_am + index * fifteen, 100, 110, 90, 100, close_time=ten_am + (index + 1) * fifteen) for index in range(50)]
+    four_hours = 4 * 60 * 60_000
+    four = [Candle("BTC", "4h", ten_am - (200 - index) * four_hours, 100, 110, 90, 100, close_time=ten_am - (199 - index) * four_hours) for index in range(200)]
+    four.append(Candle("BTC", "4h", ten_am, 100, 110, 90, 100, close_time=ten_am + four_hours))
+    CandleRepository(connect(db)).insert_many([*base, *four])
+    return TestClient(create_app(db, research_bounds=(ten_am, ten_am + 50 * fifteen))), base
+
+
+def test_chosen_replay_resolves_to_closed_15m_knowledge_time(tmp_path: Path) -> None:
+    client, base = exact_time_client(tmp_path)
+    ten_fifteen = candle_knowledge_time(base[0])
+    assert client.post("/api/sessions", json={"symbol": "BTC", "start_time": ten_fifteen, "selection_mode": "chosen_date"}).json()["replay_time"] == ten_fifteen
+    assert client.post("/api/sessions", json={"symbol": "BTC", "start_time": ten_fifteen + 7 * 60_000, "selection_mode": "chosen_date"}).json()["replay_time"] == ten_fifteen
+    assert client.post("/api/sessions", json={"symbol": "BTC", "start_time": candle_knowledge_time(base[1]), "selection_mode": "chosen_date"}).json()["replay_time"] == candle_knowledge_time(base[1])
+
+
+def test_random_replay_preserves_selected_candidate_and_range_latest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client, base = exact_time_client(tmp_path)
+    import app.annotation.research_range as ranges
+    monkeypatch.setattr(ranges.random, "choice", lambda candidates: candle_knowledge_time(base[2]))
+    interval = client.get("/api/replay-range/BTC").json()
+    random_session = client.post("/api/sessions", json={"symbol": "BTC", "selection_mode": "random"}).json()
+    assert random_session["replay_time"] == candle_knowledge_time(base[2])
+    latest = client.post("/api/sessions", json={"symbol": "BTC", "start_time": 9_999_999_999_999, "selection_mode": "chosen_date"}).json()
+    assert latest["replay_time"] == interval["latest_valid"]
+
+
+def test_advance_steps_only_newly_known_candle_and_never_moves_back(tmp_path: Path) -> None:
+    client, base = exact_time_client(tmp_path)
+    session = client.post("/api/sessions", json={"symbol": "BTC", "start_time": candle_knowledge_time(base[0]), "selection_mode": "chosen_date"}).json()
+    repository = AnnotationRepository(connect(tmp_path / "exact.sqlite3"))
+    trade = SimulatedTrade(annotation_id="a", session_id=session["session_id"], symbol="BTC", side=HumanSide.LONG, entry_price=100, stop_loss=80, take_profit=120, created_at_market_time=session["replay_time"])
+    repository.connection.execute("INSERT INTO human_annotations VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ("a", session["session_id"], "BTC", session["replay_time"], "human-ground-truth-v3", annotation_payload(session, MarketState.TRADE).__class__ and HumanAnnotation.model_validate(annotation_payload(session, MarketState.TRADE)).model_copy(update={"annotation_id": "a"}).model_dump_json(), "now", "now")); repository.connection.commit()
+    repository.save_trade(trade)
+    advanced = client.post(f"/api/sessions/{session['session_id']}/advance", json={"count": 1}).json()
+    stepped = AnnotationRepository(connect(tmp_path / "exact.sqlite3")).trades(session["session_id"])[0]
+    assert advanced["replay_time"] == candle_knowledge_time(base[1])
+    assert stepped.status == "open" and stepped.entry_time == candle_knowledge_time(base[1])
+    again = client.post(f"/api/sessions/{session['session_id']}/advance", json={"count": 1000}).json()
+    assert again["replay_time"] >= advanced["replay_time"]
+
+
+def test_trade_lifecycle_and_ohlc_times_use_knowledge_time() -> None:
+    closed = Candle("BTC", "15m", 10_000, 100, 110, 90, 100, close_time=11_000)
+    assert step_trade({"status": "pending", "side": "long", "entry_price": 100, "stop_loss": 85, "take_profit": 120}, closed)["entry_time"] == 11_000
+    assert step_trade({"status": "open", "side": "long", "entry_price": 100, "stop_loss": 85, "take_profit": 105}, closed)["exit_time"] == 11_000
+    assert step_trade({"status": "pending", "side": "long", "entry_price": 100, "stop_loss": 95, "take_profit": 110}, closed)["status"] == "ambiguous"
+    assert step_trade({"status": "open", "side": "long", "entry_price": 100, "stop_loss": 95, "take_profit": 110}, Candle("BTC", "15m", 1, 100, 105, 94, 100, close_time=2))["status"] == "stopped"
+    assert step_trade({"status": "open", "side": "long", "entry_price": 100, "stop_loss": 90, "take_profit": 105}, Candle("BTC", "15m", 1, 100, 106, 96, 100, close_time=2))["status"] == "target"
+
+
+def test_strong_point_must_be_a_visible_candle_open_but_projection_remains_legal(tmp_path: Path) -> None:
+    client, base = exact_time_client(tmp_path)
+    session = client.post("/api/sessions", json={"symbol": "BTC", "start_time": candle_knowledge_time(base[0]), "selection_mode": "chosen_date"}).json()
+    payload = annotation_payload(session)
+    payload["structures"][0]["geometry"]["vertices"][2]["timestamp"] = session["replay_time"] + 9_999
+    payload["strong_points"] = [{"strong_point_id": "hidden", "timeframe": "15m", "point": {"timestamp": base[1].open_time, "price": 100}, "snap_mode": "free"}]
+    assert client.post("/api/annotations", json=payload).status_code == 422
+    payload["strong_points"][0]["point"]["timestamp"] = base[0].open_time
+    assert client.post("/api/annotations", json=payload).status_code == 200
+    payload["annotation_id"] = "hidden-4h"
+    payload["strong_points"][0] = {"strong_point_id": "hidden-4h", "timeframe": "4h", "point": {"timestamp": base[0].open_time, "price": 100}, "snap_mode": "free"}
+    assert client.post("/api/annotations", json=payload).status_code == 422
+
+
+def test_schema_version_is_closed() -> None:
+    with pytest.raises(ValueError):
+        HumanAnnotation(session_id="s", symbol="BTC", decision_time=1, market_state=MarketState.NO_STRUCTURE, schema_version="anything")
+
+
+def test_export_includes_only_free_replay_annotations_and_trades(tmp_path: Path) -> None:
+    db = tmp_path / "modes.sqlite3"; init_db(db); repository = AnnotationRepository(connect(db))
+    sessions = [repository.create_session(ReplaySession(symbol="BTC", started_at_market_time=2, replay_time=2, mode=mode)) for mode in ("free_replay", "reconstruct_real_trade", "review_bot_candidate")]
+    annotations: list[HumanAnnotation] = []
+    for index, session in enumerate(sessions):
+        annotation = repository.save_annotation(HumanAnnotation(annotation_id=f"annotation-{index}", session_id=session.session_id, symbol="BTC", decision_time=2, market_state=MarketState.TRADE, side=HumanSide.LONG, structures=[structure()], trade_plan={"entry_price": 100, "stop_loss": 95, "take_profit": 110}))
+        repository.save_trade(SimulatedTrade(annotation_id=annotation.annotation_id, session_id=session.session_id, symbol="BTC", side=HumanSide.LONG, entry_price=100, stop_loss=95, take_profit=110, created_at_market_time=2))
+        annotations.append(annotation)
+    output = tmp_path / "batches"; root = Path(__file__).parents[1]
+    subprocess.run([sys.executable, "scripts/export_human_ground_truth.py", "--db", str(db), "--output", str(output), "--batch", "batch_001"], cwd=root, check=True)
+    exported = [HumanAnnotation.model_validate_json(line) for line in (output / "batch_001" / "annotations.jsonl").read_text().splitlines()]
+    manifest = json.loads((output / "batch_001" / "manifest.json").read_text())
+    assert [item.annotation_id for item in exported] == [annotations[0].annotation_id]
+    assert manifest["included_session_modes"] == ["free_replay"]
+    assert manifest["excluded_annotation_count_by_session_mode"] == {"reconstruct_real_trade": 1, "review_bot_candidate": 1}
+
+
+def test_manual_exit_uses_current_replay_time_and_price(tmp_path: Path) -> None:
+    client, db = seeded_client(tmp_path); session = create_session(client)
+    repository = AnnotationRepository(connect(db))
+    annotation = repository.save_annotation(HumanAnnotation.model_validate(annotation_payload(session, MarketState.TRADE)))
+    trade = repository.save_trade(SimulatedTrade(annotation_id=annotation.annotation_id, session_id=session["session_id"], symbol="BTC", side=HumanSide.LONG, entry_price=100, stop_loss=95, take_profit=110, created_at_market_time=session["replay_time"], status="open", entry_time=session["replay_time"]))
+    response = client.post(f"/api/trades/{trade.simulated_trade_id}/manual-exit", json={"price": 101, "timestamp": session["replay_time"]})
+    assert response.status_code == 200
+    assert response.json()["status"] == "manual_exit"
+    assert response.json()["exit_time"] == session["replay_time"]
+    assert response.json()["exit_price"] == 101
