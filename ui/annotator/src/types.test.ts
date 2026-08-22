@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { noFuturePoint, toTimestamp, triangleVerticesAreReplaySafe, type Annotation } from './types';
-import { createStrongPoint, createTrendline, createTriangle, forTimeframe, normalizeStoredDraft, planIsDirectional, updateLevelCoordinates, updateStrongPoint, updateTrendline, updateTriangleVertices, withMarketState } from './draft';
+import { canMutateDraft, createStrongPoint, createTrendline, createTriangle, forTimeframe, normalizeStoredDraft, planIsDirectional, redoDraftHistory, snapshotForCapture, undoDraftHistory, updateLevelCoordinates, updateStrongPoint, updateTrendline, updateTriangleVertices, withMarketState } from './draft';
 import { canonicalTrianglePoint, createTriangleTimeAxis, dataIndexForTimestamp, hasThreeTriangleCoordinates, overlayPointForTriangle, timestampForDataIndex } from './charts/triangleProjection';
 
 describe('chart annotation domain boundaries', () => {
@@ -108,5 +108,29 @@ describe('chart annotation domain boundaries', () => {
     const long: Annotation = { annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 1, market_state: 'trade', side: 'long', structures: [], trendlines: [], strong_points: [], levels: [], trade_plan: { entry_price: 100, stop_loss: 95, take_profit: 110 } };
     expect(planIsDirectional(long)).toBe(true);
     expect(planIsDirectional({ ...long, trade_plan: { entry_price: 100, stop_loss: 105, take_profit: 110 } })).toBe(false);
+  });
+
+  it('blocks every draft mutation while a record operation owns the chart', () => {
+    expect(canMutateDraft('record')).toBe(false);
+    expect(canMutateDraft('timeframe')).toBe(false);
+    expect(canMutateDraft(null)).toBe(true);
+  });
+
+  it('keeps captured screenshot geometry equal to the record payload despite later edits', () => {
+    const annotation: Annotation = { annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 1, market_state: 'valid_triangle_no_trade', structures: [createTriangle('triangle', '15m', 'entry', [{ timestamp: 1, price: 110 }, { timestamp: 2, price: 90 }, { timestamp: 3, price: 100 }], 'free')], trendlines: [], strong_points: [], levels: [] };
+    const captured = snapshotForCapture(annotation);
+    annotation.structures[0].geometry = { vertices: [{ timestamp: 9, price: 1 }, { timestamp: 10, price: 2 }, { timestamp: 11, price: 3 }], snap_mode: 'free' };
+    expect(captured.structures[0].geometry).toMatchObject({ vertices: [{ timestamp: 1, price: 110 }, { timestamp: 2, price: 90 }, { timestamp: 3, price: 100 }] });
+  });
+
+  it('undoes and redoes the first decision selection with its original lock', () => {
+    const fresh: Annotation = { annotation_id: 'a', session_id: 's', symbol: 'BTC', decision_time: 50, market_state: 'no_structure', structures: [], trendlines: [], strong_points: [], levels: [] };
+    const selected: Annotation = { ...fresh, market_state: 'trade' };
+    const history = [{ annotation: fresh, decisionSelected: false, decisionLockedAt: null }];
+    const redo: typeof history = [];
+    const undone = undoDraftHistory(history, redo, { annotation: selected, decisionSelected: true, decisionLockedAt: 50 });
+    expect(undone).toEqual({ annotation: fresh, decisionSelected: false, decisionLockedAt: null });
+    const redone = redoDraftHistory(history, redo, undone!);
+    expect(redone).toEqual({ annotation: selected, decisionSelected: true, decisionLockedAt: 50 });
   });
 });

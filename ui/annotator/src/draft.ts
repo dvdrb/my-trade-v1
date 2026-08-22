@@ -3,6 +3,26 @@ import type { Annotation, HumanTrendline, Point, StrongPoint, Timeframe, Triangl
 export type DraftSession = { session_id: string; symbol: string; replay_time: number };
 export type StoredDraft = { annotation: Annotation; decisionSelected: boolean; decisionLockedAt: number | null };
 
+export const canMutateDraft = (operation: string | null): boolean => operation === null;
+
+export const snapshotForCapture = (annotation: Annotation): Annotation => structuredClone(annotation);
+
+export const undoDraftHistory = (history: StoredDraft[], redo: StoredDraft[], current: StoredDraft): StoredDraft | null => {
+  const previous = history.at(-1);
+  if (!previous) return null;
+  history.splice(-1, 1);
+  redo.push(current);
+  return previous;
+};
+
+export const redoDraftHistory = (history: StoredDraft[], redo: StoredDraft[], current: StoredDraft): StoredDraft | null => {
+  const next = redo.at(-1);
+  if (!next) return null;
+  redo.splice(-1, 1);
+  history.push(current);
+  return next;
+};
+
 /** Restore only local state that cannot silently change an already chosen decision. */
 export const normalizeStoredDraft = (value: unknown, session: DraftSession): StoredDraft | null => {
   if (!value || typeof value !== "object") return null;
