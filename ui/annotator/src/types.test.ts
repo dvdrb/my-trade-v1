@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { noFuturePoint, toTimestamp, triangleVerticesAreReplaySafe, type Annotation } from './types';
 import { canMutateDraft, createStrongPoint, createTrendline, createTriangle, forTimeframe, normalizeStoredDraft, planIsDirectional, redoDraftHistory, snapshotForCapture, undoDraftHistory, updateLevelCoordinates, updateStrongPoint, updateTrendline, updateTriangleVertices, withMarketState } from './draft';
 import { canonicalTrianglePoint, createTriangleTimeAxis, dataIndexForTimestamp, hasThreeTriangleCoordinates, overlayPointForTriangle, timestampForDataIndex } from './charts/triangleProjection';
+import { restoreOverlayLock } from './charts/restoreLock';
 
 describe('chart annotation domain boundaries', () => {
   it('normalizes seconds to timestamp milliseconds', () => {
@@ -132,5 +133,18 @@ describe('chart annotation domain boundaries', () => {
     expect(undone).toEqual({ annotation: fresh, decisionSelected: false, decisionLockedAt: null });
     const redone = redoDraftHistory(history, redo, undone!);
     expect(redone).toEqual({ annotation: selected, decisionSelected: true, decisionLockedAt: 50 });
+  });
+
+  it('creates editable overlays for normal restores and locked overlays for capture restores', () => {
+    expect(restoreOverlayLock(true)).toBe(false);
+    expect(restoreOverlayLock(false)).toBe(true);
+  });
+
+  it('preserves projected screenshot geometry while capture overlays are physically locked', () => {
+    const geometry = createTriangle('projected', '15m', 'entry', [{ timestamp: 1, price: 110 }, { timestamp: 3, price: 90 }, { timestamp: 8, price: 100 }], 'free').geometry;
+    const captured = structuredClone(geometry);
+    expect(restoreOverlayLock(false)).toBe(true);
+    expect(captured).toEqual(geometry);
+    expect(restoreOverlayLock(true)).toBe(false);
   });
 });

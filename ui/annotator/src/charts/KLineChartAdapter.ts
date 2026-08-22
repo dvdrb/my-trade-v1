@@ -24,6 +24,7 @@ import {
   overlayPointForTriangle,
   type TriangleTimeAxis,
 } from "./triangleProjection";
+import { restoreOverlayLock } from "./restoreLock";
 
 type SnapMode = "free" | "weak" | "strong";
 type DrawLine = (line: OverlayLine) => void;
@@ -236,6 +237,7 @@ export class KLineChartAdapter {
     levels: PriceLevel[],
     plan: TradePlan | null,
     side: "long" | "short" | null,
+    interactive: boolean,
     onTriangleEdit: (id: string, vertices: [Point, Point, Point]) => void,
     onTrendlineEdit: (id: string, p1: Point, p2: Point) => void,
     onStrongPointEdit: (id: string, point: Point) => void,
@@ -262,7 +264,7 @@ export class KLineChartAdapter {
         const id = this.chart.createOverlay({
           name: humanTriangleOverlay,
           groupId: structure.structure_id,
-          lock: false,
+          lock: restoreOverlayLock(interactive),
           mode: mode(geometry.snap_mode),
           points,
           onPressedMoveEnd: (event) => {
@@ -282,7 +284,7 @@ export class KLineChartAdapter {
         const id = this.chart.createOverlay({
           name: "straightLine",
           groupId: structure.structure_id,
-          lock: false,
+          lock: restoreOverlayLock(interactive),
           mode: mode(geometry.snap_mode),
           points: [
             { timestamp: line.p1.timestamp, value: line.p1.price },
@@ -305,7 +307,7 @@ export class KLineChartAdapter {
       const axis = this.triangleTimeAxis;
       if (!axis) continue;
       const id = this.chart.createOverlay({
-        name: "straightLine", groupId: trendline.trendline_id, lock: false, mode: mode(trendline.snap_mode),
+        name: "straightLine", groupId: trendline.trendline_id, lock: restoreOverlayLock(interactive), mode: mode(trendline.snap_mode),
         points: [overlayPointForTriangle(axis, trendline.p1), overlayPointForTriangle(axis, trendline.p2)],
         styles: { line: { color: "#f1c572", size: 2 } },
         onPressedMoveEnd: (event) => {
@@ -320,7 +322,7 @@ export class KLineChartAdapter {
       const axis = this.triangleTimeAxis;
       if (!axis) continue;
       const id = this.chart.createOverlay({
-        name: humanStrongPointOverlay, groupId: strongPoint.strong_point_id, lock: false, mode: mode(strongPoint.snap_mode),
+        name: humanStrongPointOverlay, groupId: strongPoint.strong_point_id, lock: restoreOverlayLock(interactive), mode: mode(strongPoint.snap_mode),
         points: [overlayPointForTriangle(axis, strongPoint.point)],
         onPressedMoveEnd: (event) => {
           const points = this.marketPoints(event, 1, false);
@@ -335,7 +337,7 @@ export class KLineChartAdapter {
         // A strong zone is an actual price/time rectangle, not a disguised level line.
         name: level.kind === "strong_zone" ? "rect" : level.end ? "straightLine" : "horizontalStraightLine",
         groupId: level.level_id,
-        lock: false,
+        lock: restoreOverlayLock(interactive),
         points: level.end
           ? [
               { timestamp: level.start.timestamp, value: level.start.price },
@@ -369,7 +371,7 @@ export class KLineChartAdapter {
         const id = this.chart.createOverlay({
           name: "horizontalStraightLine",
           groupId: `plan-${key}`,
-          lock: false,
+          lock: restoreOverlayLock(interactive),
           points: [{ timestamp: 0, value: plan[key] }],
           styles: { line: { color: colors[key], size: 2 } },
           onPressedMoveEnd: (event) => {

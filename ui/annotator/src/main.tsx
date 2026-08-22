@@ -67,7 +67,7 @@ function App() {
   const restore = (draft = annotation, tf = timeframe, editable = true) => {
     if (!draft || !chart.current) return;
     const visible = forTimeframe(draft, tf);
-    chart.current.restore(visible.structures, visible.trendlines, visible.strong_points, visible.levels, visible.trade_plan ?? null, visible.side ?? null,
+    chart.current.restore(visible.structures, visible.trendlines, visible.strong_points, visible.levels, visible.trade_plan ?? null, visible.side ?? null, editable,
       (id, vertices) => editable && !operationRef.current && change((item) => ({ ...item, structures: updateTriangleVertices(item.structures, id, vertices) })),
       (id, p1, p2) => editable && !operationRef.current && change((item) => ({ ...item, trendlines: updateTrendline(item.trendlines, id, p1, p2) })),
       (id, point) => editable && !operationRef.current && change((item) => ({ ...item, strong_points: updateStrongPoint(item.strong_points, id, point) })),
